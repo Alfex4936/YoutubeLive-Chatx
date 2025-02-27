@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>YouTube Chat WebSocket Test</title>
+
+    <!-- SockJS + STOMP -->
+    <script src="https://cdn.jsdelivr.net/sockjs/1.1.2/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            margin-bottom: 10px;
+        }
+        .controls {
+            margin-bottom: 15px;
+        }
+        .controls label {
+            margin-right: 5px;
+        }
+        input[type=text] {
+            width: 200px;
+            margin-right: 10px;
+        }
+        button {
+            margin-right: 10px;
+        }
+        #chat {
+            width: 100%;
+            height: 1000px;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+            padding: 10px;
+            background: #fafafa;
+        }
+        #chat p {
+            margin: 0 0 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+<h1>YouTube Chat WebSocket Test</h1>
+
+<div class="controls">
+    <label for="videoId">YouTube Video ID:</label>
+    <input type="text" id="videoId" placeholder="e.g. jfKfPfyJRdk" value="jfKfPfyJRdk" />
+    <br /><br />
+
+    <button onclick="startScraper()">Start Scraper</button>
+    <button onclick="stopScraper()">Stop Scraper</button>
+    <button onclick="connectWebSocket()">Connect WS</button>
+    <button onclick="disconnectWebSocket()">Disconnect WS</button>
+    <button onclick="clearChat()">Clear Chat</button>
+</div>
+
+<div id="chat"></div>
+
+<script>
+    var stompClient = null;
+
+    function startScraper() {
+        var vid = document.getElementById("videoId").value.trim();
+        if (!vid) {
+            alert("Please enter a Video ID");
+            return;
+        }
+        fetch("/start-scraper?videoId=" + encodeURIComponent(vid))
+            .then(r => r.text())
+            .then(msg => appendMessage("StartScraper: " + msg))
+            .catch(err => appendMessage("Error: " + err));
+    }
+
+    function stopScraper() {
+        var vid = document.getElementById("videoId").value.trim();
+        if (!vid) {
+            alert("Enter a Video ID to stop");
+            return;
+        }
+        fetch("/stop-scraper?videoId=" + encodeURIComponent(vid))
+            .then(r => r.text())
+            .then(msg => appendMessage("StopScraper: " + msg))
+            .catch(err => appendMessage("Error: " + err));
+    }
+
+    function connectWebSocket() {
+        var vid = document.getElementById("videoId").value.trim();
+        if (!vid) {
+            alert("Please enter a Video ID to connect");
+            return;
+        }
+
+        // Create a new SockJS instance
+        var socket = new SockJS('/ws');  // Your Spring Boot endpoint
+        stompClient = Stomp.over(socket);
+
+        // Connect STOMP
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame);
+            appendMessage("WebSocket connected: " + frame);
+
+            // Subscribe to "/live/chat/{vid}"
+            stompClient.subscribe("/live/chat/" + vid, function (msg) {
+                appendMessage(msg.body);
+            });
+        }, function (error) {
+            console.error("STOMP error:", error);
+            appendMessage("WebSocket error: " + error);
+        });
+    }
+
+    function disconnectWebSocket() {
+        if (stompClient !== null) {
+            stompClient.disconnect(function() {
+                console.log("Disconnected WS");
+                appendMessage("WebSocket disconnected");
+            });
+        }
+    }
+
+    function clearChat() {
+        document.getElementById("chat").innerHTML = "";
+    }
+
+    function appendMessage(message) {
+        var chatDiv = document.getElementById("chat");
+        var p = document.createElement("p");
+        p.textContent = message;
+        chatDiv.appendChild(p);
+
+        // Auto-scroll to bottom
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+</script>
+</body>
+</html>
