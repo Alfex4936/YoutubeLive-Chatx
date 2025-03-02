@@ -97,6 +97,8 @@
         // Create a new SockJS instance
         var socket = new SockJS('/ws');  // Your Spring Boot endpoint
         stompClient = Stomp.over(socket);
+        stompClient.heartbeat.outgoing = 10000; // send heartbeat every 10 seconds
+        stompClient.heartbeat.incoming = 10000; // expect heartbeat every 10 seconds
 
         // Connect STOMP
         stompClient.connect({}, function (frame) {

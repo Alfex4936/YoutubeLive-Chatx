@@ -80,6 +80,48 @@ public class YTChatScraperServiceTest {
     }
 
     @Test
+    public void testMultipleScrapersConcurrent() throws Exception {
+        int scraperCount = 3;
+        CountDownLatch startedLatch = new CountDownLatch(scraperCount);
+        CountDownLatch finishLatch = new CountDownLatch(1);
+
+        // Create a single TestYTChatScraperService instance that uses the common latches.
+        TestYTChatScraperService service = new TestYTChatScraperService(
+                chatBroadcastService,
+                profanityLogService,
+                playwrightFactory,
+                keywordRankingService,
+                executorService,
+                finishLatch,
+                startedLatch
+        );
+
+        // Define multiple video IDs.
+        String[] videoIds = {"video1", "video2", "video3"};
+        var futures = new CompletableFuture[videoIds.length];
+
+        // Start a scraper for each video ID.
+        for (int i = 0; i < videoIds.length; i++) {
+            futures[i] = service.scrapeChannel(videoIds[i]);
+        }
+
+        // Wait until all scrapers have started (i.e. runScraper has been entered for each).
+        assertTrue(startedLatch.await(2, TimeUnit.SECONDS), "Not all scrapers started in time.");
+
+        // Verify that the activeScrapers map contains all three scrapers.
+        assertEquals(scraperCount, service.activeScrapers.size(), "Active scrapers map should contain all scrapers.");
+
+        // Release all scrapers so they can complete.
+        finishLatch.countDown();
+
+        // Wait for all futures to complete.
+        CompletableFuture.allOf(futures).get(2, TimeUnit.SECONDS);
+
+        // After all scrapers have finished, the activeScrapers map should be empty.
+        assertTrue(service.activeScrapers.isEmpty(), "Active scrapers map should be empty after all scrapers finish.");
+    }
+
+    @Test
     public void testStopScraperNoActive() {
         // Use TestableYTChatScraperService to test stopScraper
         TestableYTChatScraperService service = new TestableYTChatScraperService(

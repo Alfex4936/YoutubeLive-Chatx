@@ -5,9 +5,19 @@ plugins {
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
-
 group = "csw"
 version = "0.0.1-SNAPSHOT"
+
+application {
+	mainClass.set("csw.youtube.chat.Application")
+	applicationDefaultJvmArgs = listOf(
+		"-Xms2G", // Set initial heap size to 2GB
+		"-Xmx8G", // Set max heap size to 8GB
+		"-XX:+UseZGC", // Use Z Garbage Collector
+		"-XX:+ZGenerational", // Enable Generational ZGC (Java 21+)
+		"-XX:TieredStopAtLevel=1" // Reduce JIT compilation overhead
+	)
+}
 
 java {
 	toolchain {
@@ -49,4 +59,8 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.named<JavaExec>("run") { // "run" is the default task name for application plugin
+	environment["PWDEBUG"] = "1"
 }
