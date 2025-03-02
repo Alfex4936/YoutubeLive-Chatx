@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 public class ProfanityLogService {
 
     private final ProfanityLogRepository repository;
-    private final ProfanityCheckService profanityCheckService; // Your existing service
+    private final ProfanityCheckService profanityCheckService;
 
     /**
      * Checks if the message contains profanity.

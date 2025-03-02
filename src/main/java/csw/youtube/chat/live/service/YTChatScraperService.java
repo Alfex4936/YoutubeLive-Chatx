@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -70,11 +69,13 @@ public class YTChatScraperService {
     }
 
     /**
+     *
      * Returns or creates an LRU+time-based cache for the given videoId.
      * This cache is used to deduplicate messages and prevent reprocessing.
      *
      * @param videoId The YouTube video ID.
      * @return The message cache for the given videoId.
+     * @DEPRECATED we don't need this anymore in favor of MutationObserver.
      */
     Cache<String, Boolean> getMessageCache(String videoId) {
         return perVideoMessageCache.computeIfAbsent(videoId, _ ->
@@ -87,48 +88,145 @@ public class YTChatScraperService {
 
     /**
      * Starts scraping chat messages for a given YouTube video ID if a scraper is not already active.
-     * This method is asynchronous and returns a {@link CompletableFuture} representing the scraping task.
-     * If a scraper is already running for the given video ID, it will log a warning and return a completed future.
+     * This method is fully asynchronous (via @Async on a Virtual Thread executor) and will not block
+     * the calling thread. It returns a CompletableFuture representing the ongoing scrape.
+     *
+     * To stop the scraper, either complete or cancel this future externally.
      *
      * @param videoId The YouTube video ID to scrape.
-     * @return A {@link CompletableFuture} that completes when the scraper finishes or if it's already running.
-     * The future does not hold any meaningful value upon completion.
+     * @return A CompletableFuture that completes when the scraper finishes or is canceled.
      * @throws IllegalArgumentException if the videoId is null or empty.
      */
     @Async("chatScraperExecutor")
     public CompletableFuture<Void> scrapeChannel(String videoId) {
-        if (videoId.trim().isEmpty()) {
+        if (videoId == null || videoId.trim().isEmpty()) {
             throw new IllegalArgumentException("Video ID cannot be null or empty.");
         }
 
         if (activeScrapers.containsKey(videoId)) {
             log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
-            return CompletableFuture.completedFuture(null); // Already running, nothing to do
+            return CompletableFuture.completedFuture(null);
         }
 
         log.info("Starting chat scraper for video ID: {}", videoId);
         CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
         activeScrapers.put(videoId, scraperFuture);
 
-        log.info("[Thread: {}] Starting scrapeChannel for video ID: {}", Thread.currentThread().getName(), videoId); // Thread log - scrapeChannel
+        // All logic is in this try-block so we don't need an extra runScraper() method
+        try (Playwright playwright = playwrightFactory.create();
+             Browser browser = launchBrowser(playwright);
+             Page page = browser.newPage()) {
 
-        // Run the scraper logic asynchronously using the configured executor
-        CompletableFuture.runAsync(() -> {
-                    log.info("[Thread: {}] Running runScraper asynchronously for video ID: {}", Thread.currentThread().getName(), videoId); // Thread log - runScraper async start
-                    runScraper(videoId);
-                    log.info("[Thread: {}] runScraper completed asynchronously for video ID: {}", Thread.currentThread().getName(), videoId); // Thread log - runScraper async end
-                }, chatScraperExecutor)
-                .whenComplete((res, ex) -> {
-                    activeScrapers.remove(videoId); // Clean up active scraper map
-                    if (ex != null) {
-                        log.error("Scraper for video {} completed with error: {}", videoId, ex.getMessage(), ex);
-                        scraperFuture.completeExceptionally(ex); // Propagate exception to the future
-                    } else {
-                        log.info("Scraper for video {} completed successfully.", videoId);
-                        scraperFuture.complete(null); // Complete normally
+            // Navigate to the watch page
+            String fullUrl = YOUTUBE_WATCH_URL + videoId;
+            page.navigate(fullUrl);
+            page.waitForLoadState(LoadState.DOMCONTENTLOADED);
+
+            // Wait for the chat iframe, gather basic info
+            waitForChatIframe(page);
+            String videoTitle = extractVideoTitle(page);
+            String channelName = extractChannelName(page);
+            log.info("Video Title: '{}', Channel Name: '{}' for video {}", videoTitle, channelName, videoId);
+
+            // Set up references to chat area
+            FrameLocator chatFrameLocator = page.frameLocator("iframe#chatframe");
+            Locator chatBodyLocator = chatFrameLocator.locator("body");
+            Locator chatMessagesLocator = chatFrameLocator.locator("div#items yt-live-chat-text-message-renderer");
+            // noinspection resource
+            Page iframePage = chatBodyLocator.page(); // 기존 page 하위 객체라 안닫아도 됨
+            waitForInitialMessages(chatMessagesLocator);
+
+            // Throughput tracking variables
+            AtomicInteger totalMessages = new AtomicInteger(0);   // Total messages since start
+            AtomicInteger messagesPerInterval = new AtomicInteger(0); // Messages per time window
+
+            // Expose Java function that the browser can call when new messages appear
+            iframePage.evaluate("window._ytChatHandler = {}");
+            iframePage.exposeFunction("_ytChatHandler_onNewMessages", args -> {
+                try {
+                    int newMessages = chatMessagesLocator.count();
+                    int previousCount = totalMessages.get();
+                    if (newMessages > previousCount) {
+
+                        int messagesAdded = newMessages - previousCount;
+                        totalMessages.set(newMessages);
+                        messagesPerInterval.addAndGet(messagesAdded);
+
+                        processNewMessages(
+                                videoId, videoTitle, channelName,
+                                chatMessagesLocator,
+                                previousCount
+                        );
                     }
-                });
+                } catch (Exception e) {
+                    log.error("❌ Error processing new messages: {}", e.getMessage(), e);
+                }
+                return null;
+            });
 
+            // Inject a MutationObserver to call `_ytChatHandler_onNewMessages` on DOM changes
+            chatBodyLocator.evaluate("""
+                        () => {
+                            try {
+                                const chatContainer = document.querySelector('div#items');
+                                if (!chatContainer) {
+                                    console.error("Chat container not found");
+                                    return;
+                                }
+                                console.log("MutationObserver started");
+                    
+                                // Clear any existing observer
+                                if (window._chatObserver) {
+                                    window._chatObserver.disconnect();
+                                    console.log("Disconnected existing observer");
+                                }
+                    
+                                const observer = new MutationObserver(mutations => {
+                                    window._ytChatHandler_onNewMessages({ mutations: mutations.length });
+                                });
+                                observer.observe(chatContainer, { childList: true, subtree: false });
+                                window._chatObserver = observer;
+                                console.log("MutationObserver setup complete");
+                            } catch (error) {
+                                console.error("MutationObserver setup failed", error);
+                            }
+                        }
+                    """);
+
+            // Throughput logging: Every 10 seconds, log messages per interval
+            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+            ScheduledFuture<?> logTask = scheduler.scheduleAtFixedRate(() -> {
+                int count = messagesPerInterval.getAndSet(0); // Reset the counter after logging
+                log.info("📊 Throughput: {} messages processed in the last 10 seconds for video {}", count, videoId);
+            }, 10, 10, TimeUnit.SECONDS); // Logs every 10 seconds
+
+
+            // Keep the scraper running until the user signals it is done (scraperFuture completed)
+            while (!scraperFuture.isDone()) {
+                // Let Playwright handle any pending events.
+                // MutationObserver triggers `_ytChatHandler_onNewMessages` promptly.
+                page.waitForTimeout(1000);
+            }
+
+            logTask.cancel(false);
+            scheduler.shutdown();
+            // Once we exit the loop, we assume someone else completed the future.
+            if (!scraperFuture.isCompletedExceptionally()) {
+                scraperFuture.complete(null);
+                log.info("Scraper for video {} completed normally.", videoId);
+            }
+
+        } catch (Exception e) {
+            // If any top-level error occurs, complete the future with an exception
+            log.error("Error in scraping logic for video {}: {}", videoId, e.getMessage(), e);
+            scraperFuture.completeExceptionally(e);
+        } finally {
+            // Clean up from the activeScrapers map
+            activeScrapers.remove(videoId);
+            log.info("Finished or aborted scraping session for video {}", videoId);
+        }
+
+        // Return the future so the caller can check status or cancel externally
         return scraperFuture;
     }
 
@@ -149,184 +247,6 @@ public class YTChatScraperService {
         log.info("Stopping scraper requested for video ID: {}", videoId);
         return "Stopping scraper for video ID: " + videoId;
     }
-
-
-    /**
-     * Core logic for running the chat scraper for a specific video ID.
-     * This method is intended to be executed asynchronously.
-     * It uses Playwright to navigate to the YouTube Live Chat, extract messages,
-     * handle deduplication, and broadcast new messages.
-     *
-     * @param videoId The YouTube video ID to scrape.
-     */
-    void runScraper(String videoId) {
-        log.info("[Thread: {}] Executing runScraper for video {}", Thread.currentThread().getName(), videoId);
-        String fullUrl = YOUTUBE_WATCH_URL + videoId;
-
-        try (Playwright playwright = playwrightFactory.create()) {
-            Browser browser = launchBrowser(playwright);
-            try (browser; Page page = browser.newPage()) {
-                page.navigate(fullUrl);
-                page.waitForLoadState(LoadState.DOMCONTENTLOADED);
-
-                waitForChatIframe(page);
-
-                String videoTitle = extractVideoTitle(page);
-                String channelName = extractChannelName(page);
-                log.info("Video Title: '{}', Channel Name: '{}' for video ID: {}", videoTitle, channelName, videoId);
-
-                FrameLocator chatFrameLocator = page.frameLocator("iframe#chatframe");
-                Locator chatBodyLocator = chatFrameLocator.locator("body");
-                Locator chatMessagesLocator = chatFrameLocator.locator("div#items yt-live-chat-text-message-renderer");
-                Page iframePage = chatBodyLocator.page();
-                waitForInitialMessages(chatMessagesLocator);
-
-                Cache<String, Boolean> messageCache = getMessageCache(videoId);
-                AtomicInteger lastProcessed = new AtomicInteger(chatMessagesLocator.count());
-
-                // Create a unique namespace to avoid conflicts
-                iframePage.evaluate("window._ytChatHandler = {}");
-
-                // Expose the function with a clear name
-                iframePage.exposeFunction("_ytChatHandler_onNewMessages", args -> {
-                    try {
-                        int newCount = chatMessagesLocator.count();
-                        int previousCount = lastProcessed.get();
-                        if (newCount > previousCount) {
-                            processNewMessages(videoId, videoTitle, channelName, chatMessagesLocator, messageCache, previousCount);
-                            lastProcessed.set(newCount);
-                        }
-
-                    } catch (Exception e) {
-                        log.error("❌ Error processing new messages: {}", e.getMessage(), e);
-                    }
-
-                    return null;
-                });
-
-                // Inject a MutationObserver in the chat iframe to detect new messages
-                chatBodyLocator.evaluate("""
-                    () => {
-                        try {
-                            const chatContainer = document.querySelector('div#items');
-                            if (!chatContainer) {
-                                console.error("Chat container not found");
-                                return;
-                            }
-                
-                            console.log("MutationObserver started");
-                            
-                            // Clear any existing observer
-                            if (window._chatObserver) {
-                                window._chatObserver.disconnect();
-                                console.log("Disconnected existing observer");
-                            }
-                
-                            const observer = new MutationObserver(mutations => {
-                                console.log("Observer detected mutations:", mutations.length);
-                                window._ytChatHandler_onNewMessages({mutations: mutations.length});
-//                                    .then(() => console.log("Handler completed via observer"))
-//                                    .catch(e => console.error("Observer handler error:", e));
-                            });
-                
-                            observer.observe(chatContainer, { childList: true, subtree: false });
-                            window._chatObserver = observer;
-                            console.log("MutationObserver setup complete");
-                        } catch (error) {
-                            console.error("MutationObserver setup failed", error);
-                        }
-                    }
-                """);
-
-                // Get the scraper future from activeScrapers map
-                CompletableFuture<Void> scraperFuture = activeScrapers.get(videoId);
-
-                // Set up a cancellable polling scheduler using Playwright's own timing mechanisms
-                AtomicBoolean isRunning = new AtomicBoolean(true);
-
-                // Create a separate thread for the polling mechanism
-                Thread pollingThread = new Thread(() -> {
-                    try {
-                        while (isRunning.get() && !Thread.currentThread().isInterrupted()) {
-                            // Check if we've been asked to stop
-                            if (scraperFuture != null && scraperFuture.isDone()) {
-                                log.info("Scraper future completed, stopping polling loop");
-                                break;
-                            }
-
-                            // Use Playwright's own waiting mechanism for timing
-                            page.waitForTimeout(1000);
-
-                            // Poll for new messages as a backup mechanism
-                            if (!isRunning.get() || Thread.currentThread().isInterrupted()) {
-                                break;
-                            }
-
-                            int currentCount = chatMessagesLocator.count();
-                            int previousCount = lastProcessed.get();
-
-                            if (currentCount > previousCount) {
-                                processNewMessages(videoId, videoTitle, channelName, chatMessagesLocator, messageCache, previousCount);
-                                lastProcessed.set(currentCount);
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.error("Error in polling thread: {}", e.getMessage(), e);
-                    }
-                    log.info("Polling thread exited for video {}", videoId);
-                }, "chat-poller-" + videoId);
-
-                pollingThread.setDaemon(true);
-                pollingThread.start();
-
-                // Wait for the scraper future to complete or be cancelled
-                try {
-                    if (scraperFuture != null) {
-                        scraperFuture.get();
-                    } else {
-                        // If no future is provided, just wait indefinitely
-                        // This is primarily for testing purposes
-                        Object lock = new Object();
-                        synchronized (lock) {
-                            lock.wait();
-                        }
-                    }
-                } catch (InterruptedException | ExecutionException e) {
-                    log.info("Scraper waiting interrupted: {}", e.getMessage());
-                } finally {
-                    // Clean up
-                    isRunning.set(false);
-                    pollingThread.interrupt();
-                    try {
-                        pollingThread.join(1000);  // Wait up to 1 second for thread to exit
-                    } catch (InterruptedException ignored) {
-                        // Ignore
-                    }
-
-                    try {
-                        page.evaluate("() => { if (window._chatObserver) window._chatObserver.disconnect(); }");
-                        log.info("MutationObserver disconnected");
-                    } catch (Exception e) {
-                        log.warn("Error disconnecting observer: {}", e.getMessage());
-                    }
-                }
-
-                log.info("Scraper loop completed for video {}", videoId);
-                log.info("[Thread: {}] Scraper loop completed for video {}", Thread.currentThread().getName(), videoId);
-
-            } catch (PlaywrightException pwe) {
-                handlePlaywrightException(videoId, pwe);
-            } catch (Exception e) {
-                handleGeneralException(videoId, e);
-            }
-            log.info("Scraper finished for video {}", videoId);
-            log.info("[Thread: {}] Scraper finished for video {}", Thread.currentThread().getName(), videoId);
-
-        } catch (Exception topLevelException) {
-            log.error("Scraper setup failed for video {}: {}", videoId, topLevelException.getMessage(), topLevelException);
-        }
-    }
-
 
     Browser launchBrowser(Playwright playwright) {
         log.debug("Launching browser instance.");
@@ -354,7 +274,7 @@ public class YTChatScraperService {
     }
 
 
-    void processNewMessages(String videoId, String videoTitle, String channelName, Locator chatMessagesLocator, Cache<String, Boolean> messageCache, int processedMessageCount) {
+    void processNewMessages(String videoId, String videoTitle, String channelName, Locator chatMessagesLocator, int processedMessageCount) {
         int currentMessageCount = chatMessagesLocator.count();
         if (currentMessageCount <= processedMessageCount) {
             return; // No new messages
@@ -362,23 +282,23 @@ public class YTChatScraperService {
 
         // log.debug("Processing new messages from index {} to {}", processedMessageCount, currentMessageCount - 1);
         for (int i = processedMessageCount; i < currentMessageCount; i++) {
-            processSingleMessage(videoId, videoTitle, channelName, chatMessagesLocator.nth(i), messageCache);
+            processSingleMessage(videoId, videoTitle, channelName, chatMessagesLocator.nth(i));
         }
     }
 
 
-    void processSingleMessage(String videoId, String videoTitle, String channelName, Locator messageElement, Cache<String, Boolean> messageCache) {
+    void processSingleMessage(String videoId, String videoTitle, String channelName, Locator messageElement) {
         try {
             String username = extractUsername(messageElement);
             String messageText = extractMessageText(messageElement);
             String stableKey = buildStableKey(username, messageText);
             log.debug("{}: {}", username, messageText);
 
-            if (messageCache.getIfPresent(stableKey) != null) {
-                // log.debug("Duplicate message detected, skipping. Key: {}", stableKey);
-                return; // Skip duplicate message
-            }
-            messageCache.put(stableKey, Boolean.TRUE); // Mark message as processed
+//            if (messageCache.getIfPresent(stableKey) != null) {
+//                // log.debug("Duplicate message detected, skipping. Key: {}", stableKey);
+//                return; // Skip duplicate message
+//            }
+//            messageCache.put(stableKey, Boolean.TRUE); // Mark message as processed
 
             ChatMessage chatMessage = new ChatMessage(videoTitle, channelName, videoId, UUID.randomUUID().toString(), username, messageText, System.currentTimeMillis());
             chatBroadcastService.broadcast(videoId, chatMessage); // Broadcast to subscribers
@@ -398,32 +318,32 @@ public class YTChatScraperService {
 
     String extractMessageText(Locator messageElement) {
         return (String) messageElement.evaluate("""
-        (el) => {
-            // Get the message container from shadow DOM if available
-            const container = el.shadowRoot 
-                ? el.shadowRoot.querySelector('#message') 
-                : el.querySelector('#message');
-            if (!container) return '';
-
-            // Use XPath to get all descendant nodes in order
-            const xpathResult = document.evaluate(
-                './/node()', container, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null
-            );
-
-            let result = '';
-            for (let i = 0; i < xpathResult.snapshotLength; i++) {
-                const node = xpathResult.snapshotItem(i);
-                if (node.nodeType === Node.TEXT_NODE) {
-                    result += node.textContent;
-                } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'img') {
-                    // Prefer shared-tooltip-text (which is often formatted like :emoji:) if available
-                    const emoji = node.getAttribute('shared-tooltip-text') || node.getAttribute('alt') || '';
-                    result += emoji;
-                }
-            }
-            return result;
-        }
-    """);
+                    (el) => {
+                        // Get the message container from shadow DOM if available
+                        const container = el.shadowRoot 
+                            ? el.shadowRoot.querySelector('#message') 
+                            : el.querySelector('#message');
+                        if (!container) return '';
+                
+                        // Use XPath to get all descendant nodes in order
+                        const xpathResult = document.evaluate(
+                            './/node()', container, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null
+                        );
+                
+                        let result = '';
+                        for (let i = 0; i < xpathResult.snapshotLength; i++) {
+                            const node = xpathResult.snapshotItem(i);
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                result += node.textContent;
+                            } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'img') {
+                                // Prefer shared-tooltip-text (which is often formatted like :emoji:) if available
+                                const emoji = node.getAttribute('shared-tooltip-text') || node.getAttribute('alt') || '';
+                                result += emoji;
+                            }
+                        }
+                        return result;
+                    }
+                """);
     }
 
     String extractVideoTitle(Page page) {
