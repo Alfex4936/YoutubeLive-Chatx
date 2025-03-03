@@ -52,7 +52,7 @@ dependencies {
 	implementation("com.fasterxml.jackson.module","jackson-module-blackbird","2.18.2")
 	implementation("com.microsoft.playwright", "playwright", "1.50.0")
 	implementation("com.google.guava:guava:33.4.0-jre")
-
+	implementation("org.apache.commons:commons-pool2:2.12.1")
 
 	runtimeOnly("org.postgresql:postgresql")
 	compileOnly("org.projectlombok:lombok")

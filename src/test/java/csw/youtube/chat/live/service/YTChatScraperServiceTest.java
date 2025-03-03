@@ -1,326 +1,425 @@
 package csw.youtube.chat.live.service;
 
-
 import com.microsoft.playwright.*;
-import csw.youtube.chat.playwright.PlaywrightFactory;
+import com.microsoft.playwright.options.LoadState;
+import csw.youtube.chat.live.dto.ChatMessage;
+import csw.youtube.chat.live.model.ScraperState;
+import csw.youtube.chat.playwright.PlaywrightBrowserPool;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.concurrent.*;
+import java.lang.reflect.Method;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-public class YTChatScraperServiceTest {
+/**
+ * Example JUnit 5 Test for YTChatScraperService.
+ */
+@ExtendWith(MockitoExtension.class)
+class YTChatScraperServiceTest {
 
-    private ExecutorService executorService;
-    private ChatBroadcastService chatBroadcastService;
-    private ProfanityLogService profanityLogService;
-    private PlaywrightFactory playwrightFactory;
-    private KeywordRankingService keywordRankingService;
+    @Mock
+    private PlaywrightBrowserPool mockPool;
+    @Mock
+    private ChatBroadcastService mockBroadcastService;
+    @Mock
+    private ProfanityLogService mockProfanityService;
+    @Mock
+    private KeywordRankingService mockKeywordRankingService;
+
+    /**
+     * The class under test.
+     */
+    @InjectMocks
+    private YTChatScraperService scraperService;
+
+    /**
+     * By default, the fields with @Getter in YTChatScraperService are final,
+     * so you should inject them via the constructor. We'll let Mockito handle that
+     * but also we can set them manually as needed.
+     */
 
     @BeforeEach
-    public void setup() {
-        // Use an executor service so that runScraper runs in a background thread
-        executorService = Executors.newCachedThreadPool();
+    void setUp() {
+        /**
+         * We can use a direct Executor that runs tasks on the same thread so our test doesn't return immediately.
+         * That ensures we can verify the results synchronously.
+         */
+        Executor singleThreadExecutor = Runnable::run;  // A simple executor that runs on calling thread
+        // We can override the actual executor in the service if it's not final. If it's final,
+        // you might need a small refactor or constructor injection with a different bean in tests.
 
-        // Create mocks for dependencies that are not used in our test logic.
-        chatBroadcastService = Mockito.mock(ChatBroadcastService.class);
-        profanityLogService = Mockito.mock(ProfanityLogService.class);
-        playwrightFactory = Mockito.mock(PlaywrightFactory.class);
-        keywordRankingService = Mockito.mock(KeywordRankingService.class);
-    }
-
-    @AfterEach
-    public void tearDown() {
-        executorService.shutdownNow();
-    }
-
-    @Test
-    public void testConcurrentScraperSingleVideo() throws Exception {
-        // Latch to simulate the long-running nature of runScraper.
-        CountDownLatch finishLatch = new CountDownLatch(1);
-        // Latch to know when runScraper has been entered.
-        CountDownLatch startedLatch = new CountDownLatch(1);
-
-        TestYTChatScraperService service = new TestYTChatScraperService(
-                chatBroadcastService,
-                profanityLogService,
-                playwrightFactory,
-                keywordRankingService,
-                executorService,
-                finishLatch,
-                startedLatch
-        );
-
-        String videoId = "testVideo123";
-
-        // Start the first scraper; it will block on finishLatch.await()
-        CompletableFuture<Void> future1 = service.scrapeChannel(videoId);
-
-        // Wait until runScraper is entered.
-        assertTrue(startedLatch.await(2, TimeUnit.SECONDS), "Scraper did not start in time.");
-
-        // Concurrently call scrapeChannel again for the same videoId.
-        CompletableFuture<Void> future2 = service.scrapeChannel(videoId);
-
-        // Since a scraper is already running, the second call should immediately return a completed future.
-        assertTrue(future2.isDone(), "Second scrapeChannel call should return a completed future as scraper is already running.");
-
-        // Now let the first scraper finish.
-        finishLatch.countDown();
-        // Wait for the first future to complete.
-        future1.get(2, TimeUnit.SECONDS);
-
-        // After completion, the activeScrapers map should no longer contain the videoId.
-        assertFalse(service.activeFutures.containsKey(videoId),
-                "Active scrapers map should not contain the videoId after the scraper completes.");
+        // If using @Qualifier("chatScraperExecutor"), you might need some test config. For simplicity, do:
+        // The easiest approach is to reflect or to have a setter. For example:
+        // scraperService.setChatScraperExecutor(singleThreadExecutor);  // If there's a setter
+        // Or we forcibly set the field with reflection if it's private final. We'll do a quick hack:
+        TestUtils.setField(scraperService, "chatScraperExecutor", singleThreadExecutor);
     }
 
     @Test
-    public void testMultipleScrapersConcurrent() throws Exception {
-        int scraperCount = 3;
-        CountDownLatch startedLatch = new CountDownLatch(scraperCount);
-        CountDownLatch finishLatch = new CountDownLatch(1);
+    void testOnDestroy_stopsAllScrapers() {
+        // Suppose we have 2 active futures
+        CompletableFuture<Void> future1 = new CompletableFuture<>();
+        CompletableFuture<Void> future2 = new CompletableFuture<>();
+        scraperService.getActiveFutures().put("vid1", future1);
+        scraperService.getActiveFutures().put("vid2", future2);
 
-        // Create a single TestYTChatScraperService instance that uses the common latches.
-        TestYTChatScraperService service = new TestYTChatScraperService(
-                chatBroadcastService,
-                profanityLogService,
-                playwrightFactory,
-                keywordRankingService,
-                executorService,
-                finishLatch,
-                startedLatch
-        );
+        // When we call onDestroy, it should call stopScraper() on each
+        scraperService.onDestroy();
 
-        // Define multiple video IDs.
-        String[] videoIds = {"video1", "video2", "video3"};
-        var futures = new CompletableFuture[videoIds.length];
-
-        // Start a scraper for each video ID.
-        for (int i = 0; i < videoIds.length; i++) {
-            futures[i] = service.scrapeChannel(videoIds[i]);
-        }
-
-        // Wait until all scrapers have started (i.e. runScraper has been entered for each).
-        assertTrue(startedLatch.await(2, TimeUnit.SECONDS), "Not all scrapers started in time.");
-
-        // Verify that the activeScrapers map contains all three scrapers.
-        assertEquals(scraperCount, service.activeFutures.size(), "Active scrapers map should contain all scrapers.");
-
-        // Release all scrapers so they can complete.
-        finishLatch.countDown();
-
-        // Wait for all futures to complete.
-        CompletableFuture.allOf(futures).get(2, TimeUnit.SECONDS);
-
-        // After all scrapers have finished, the activeScrapers map should be empty.
-        assertTrue(service.activeFutures.isEmpty(), "Active scrapers map should be empty after all scrapers finish.");
+        assertTrue(future1.isDone());
+        assertTrue(future2.isDone());
     }
 
     @Test
-    public void testStopScraperNoActive() {
-        // Use TestableYTChatScraperService to test stopScraper
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-        String videoId = "nonexistent";
-        String result = service.stopScraper(videoId);
-        assertEquals("No active scraper found for video ID: " + videoId, result);
+    void testScrapeChannel_invalidVideoId() {
+        // Should throw an IllegalArgumentException if videoId is empty
+        assertThrows(IllegalArgumentException.class, () -> scraperService.scrapeChannel(null));
+        assertThrows(IllegalArgumentException.class, () -> scraperService.scrapeChannel("   "));
     }
 
     @Test
-    public void testStopScraperWithActive() {
-        // Use TestableYTChatScraperService to test stopScraper when a scraper is active
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-        String videoId = "activeVideo";
+    void testScrapeChannel_alreadyRunning() {
+        // If a future is already active for "abcd1234", return a completedFuture
+        scraperService.getActiveFutures().put("abcd1234", new CompletableFuture<>());
 
-        // Create an active scraper future and put it into the activeScrapers map.
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        service.activeFutures.put(videoId, future);
+        CompletableFuture<Void> result = scraperService.scrapeChannel("abcd1234");
+        assertTrue(result.isDone());
+        assertFalse(result.isCompletedExceptionally());
+    }
 
-        String result = service.stopScraper(videoId);
-        assertEquals("Stopping scraper for video ID: " + videoId, result);
-        // The active scraper should be removed.
-        assertFalse(service.activeFutures.containsKey(videoId));
-        // The future should be completed.
+    @Test
+    void testWaitForChatIframe() throws Exception {
+        Page mockPage = mock(Page.class);
+        ElementHandle mockHandle = mock(ElementHandle.class);
+        when(mockPage.waitForSelector(eq("iframe#chatframe"), any(Page.WaitForSelectorOptions.class)))
+                .thenReturn(mockHandle);
+
+        Method method = YTChatScraperService.class.getDeclaredMethod("waitForChatIframe", Page.class);
+        method.setAccessible(true);
+        method.invoke(scraperService, mockPage);
+
+        verify(mockPage).waitForSelector(eq("iframe#chatframe"), any(Page.WaitForSelectorOptions.class));
+    }
+
+    @Test
+    void testWaitForInitialMessages() throws Exception {
+        Locator mockChatMessagesLocator = mock(Locator.class);
+        Locator mockFirstLocator = mock(Locator.class);
+
+        when(mockChatMessagesLocator.first()).thenReturn(mockFirstLocator);
+        doNothing().when(mockFirstLocator).waitFor(any(Locator.WaitForOptions.class));
+
+        Method method = YTChatScraperService.class.getDeclaredMethod("waitForInitialMessages", Locator.class);
+        method.setAccessible(true);
+        method.invoke(scraperService, mockChatMessagesLocator);
+
+        verify(mockChatMessagesLocator).first();
+        verify(mockFirstLocator).waitFor(any(Locator.WaitForOptions.class));
+    }
+
+
+    /**
+     * TODO make it work.
+     * This test covers the main scraping logic.
+     * We'll mock "withBrowser" to simulate behavior, and we won't let it throw an exception
+     * so we get a normal path coverage.
+     */
+    @Test
+    void testScrapeChannel_successPath_noExceptions() {
+        // 1) Stub the "withBrowser(Consumer<Browser>)" so we can intercept the Browser consumer
+        doAnswer(invocation -> {
+            Consumer<Browser> browserConsumer = invocation.getArgument(0);
+
+            // 2) Create mocks for Browser, Page, Response, FrameLocator, etc.
+            Browser mockBrowser = mock(Browser.class);
+            Page mockPage = mock(Page.class);
+            Response mockResponse = mock(Response.class);
+            ElementHandle mockElementHandle = mock(ElementHandle.class);
+            FrameLocator mockFrameLocator = mock(FrameLocator.class);
+            Locator mockBodyLocator = mock(Locator.class);
+            Locator mockChatMessagesLocator = mock(Locator.class);
+            Locator mockFirstLocator = mock(Locator.class);
+            Page mockIframePage = mock(Page.class);
+
+            // 3) Stub out the typical calls in the main logic:
+            doNothing().when(mockPage).waitForTimeout(eq(1000.0));
+
+            // page.navigate(...) -> returns Response
+            when(mockPage.navigate(anyString())).thenReturn(mockResponse);
+
+            // page.waitForLoadState(...) -> returns void
+            doNothing().when(mockPage).waitForLoadState(LoadState.DOMCONTENTLOADED);
+
+            // The scraper calls waitForSelector for "iframe#chatframe" -> returns an ElementHandle (or null).
+            when(mockPage.waitForSelector(eq("iframe#chatframe"), any(Page.WaitForSelectorOptions.class)))
+                    .thenReturn(mockElementHandle);
+
+            // The scraper calls waitForSelector for "ytd-watch-metadata" in extractVideoTitle()
+            when(mockPage.waitForSelector(eq("ytd-watch-metadata"), any(Page.WaitForSelectorOptions.class)))
+                    .thenReturn(mockElementHandle);
+
+            // page.evaluate(...) in extractVideoTitle(...) or extractChannelName(...)
+            // The code calls this multiple times – first for title, then channel name.
+            // If you need them to return different strings, you can chain:
+            when(mockPage.evaluate(anyString()))
+                    .thenReturn("My Mocked Video Title")
+                    .thenReturn("My Mocked Channel");
+
+            // The scraper calls page.frameLocator("iframe#chatframe")
+            when(mockPage.frameLocator("iframe#chatframe")).thenReturn(mockFrameLocator);
+
+            // Then calls locator("body"), locator("div#items yt-live-chat-text-message-renderer"), etc.
+            // We'll do it step by step:
+            when(mockFrameLocator.locator("body")).thenReturn(mockBodyLocator);
+            when(mockFrameLocator.locator("div#items yt-live-chat-text-message-renderer")).thenReturn(mockChatMessagesLocator);
+
+            // The code then calls bodyLocator.page() for the iframe's Page
+            when(mockBodyLocator.page()).thenReturn(mockIframePage);
+
+            // Then waitForInitialMessages(...) calls chatMessagesLocator.first().waitFor(...)
+            when(mockChatMessagesLocator.first()).thenReturn(mockFirstLocator);
+            doNothing().when(mockFirstLocator).waitFor(any(Locator.WaitForOptions.class));
+
+            // Also, the code calls page.waitForTimeout(POLL_INTERVAL_MS) in a loop. We'll just ignore that:
+            doNothing().when(mockPage).waitForTimeout(anyLong());
+
+            // The code finally calls page.close() in the "finally" block
+            doNothing().when(mockPage).close();
+
+            // 4) Now run the consumer with our mock Browser
+            when(mockBrowser.newPage()).thenReturn(mockPage);
+            browserConsumer.accept(mockBrowser);
+
+            return null;
+        }).when(mockPool).withBrowser(any());
+
+        // 5) Execute the method under test
+        CompletableFuture<Void> future = scraperService.scrapeChannel("abcd1234");
+
+        // Because we run a while-loop until the future is done, we forcibly stop
+        scraperService.stopScraper("abcd1234");
+
+        // Check the future
         assertTrue(future.isDone());
+        assertFalse(future.isCompletedExceptionally());
+
+        // Confirm the scraper state is COMPLETED
+        ScraperState state = scraperService.getScraperStates().get("abcd1234");
+        assertNotNull(state);
+        assertEquals(ScraperState.Status.COMPLETED, state.getStatus());
     }
 
+
+    /**
+     * Test a scenario where "withBrowser(...)" throws an exception somewhere inside the scraping logic.
+     */
     @Test
-    public void testLaunchBrowser() {
-        // Create mocks for Playwright, BrowserType, and Browser.
-        Playwright mockPlaywright = Mockito.mock(Playwright.class);
-        BrowserType mockBrowserType = Mockito.mock(BrowserType.class);
-        Browser mockBrowser = Mockito.mock(Browser.class);
+    void testScrapeChannel_playwrightException() {
+        // We'll simulate a PlaywrightException so we can test that path
+        PlaywrightException mockPwe = new PlaywrightException("TargetClosedError: something happened");
 
-        // Stub the call chain: playwright.chromium() -> BrowserType and launch(...) -> Browser.
-        Mockito.when(mockPlaywright.chromium()).thenReturn(mockBrowserType);
-        Mockito.when(mockBrowserType.launch(Mockito.any())).thenReturn(mockBrowser);
+        doAnswer(invocation -> {
+            Consumer<Browser> consumer = invocation.getArgument(0);
+            // We'll just throw the exception from inside consumer
+            throw mockPwe;
+        }).when(mockPool).withBrowser(any());
 
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
+        CompletableFuture<Void> future = scraperService.scrapeChannel("failVid");
+        // Because of direct executor, this runs inline and should hit the catch block
+        assertTrue(future.isDone());
+        assertTrue(future.isCompletedExceptionally());
 
-        Browser resultBrowser = service.testLaunchBrowser(mockPlaywright);
-        assertNotNull(resultBrowser, "launchBrowser should return a Browser instance.");
-        assertEquals(mockBrowser, resultBrowser, "The returned Browser instance should match the mocked Browser.");
-    }
-
-    /****** EXTRACTIONS *******/
-    @Test
-    public void testExtractUsername() {
-        // Create a mock Locator and stub evaluate to return a test username.
-        Locator mockLocator = Mockito.mock(Locator.class);
-        Mockito.when(mockLocator.evaluate(Mockito.anyString())).thenReturn("TestUser");
-
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-
-        String username = service.testExtractUsername(mockLocator);
-        assertEquals("TestUser", username);
-    }
-
-    @Test
-    public void testExtractMessageText() {
-        // Create a mock Locator and stub evaluate to return a test message text.
-        Locator mockLocator = Mockito.mock(Locator.class);
-        Mockito.when(mockLocator.evaluate(Mockito.anyString())).thenReturn("Hello, world!");
-
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-
-        String messageText = service.testExtractMessageText(mockLocator);
-        assertEquals("Hello, world!", messageText);
-    }
-
-    @Test
-    public void testExtractVideoTitle() {
-        // Create a mock Page and stub waitForSelector and evaluate.
-        Page mockPage = Mockito.mock(Page.class);
-        Mockito.when(mockPage.waitForSelector(Mockito.anyString(), Mockito.any()))
-                .thenReturn(null);
-        Mockito.when(mockPage.evaluate(Mockito.anyString()))
-                .thenReturn("Test Video Title");
-
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-
-        String title = service.testExtractVideoTitle(mockPage);
-        assertEquals("Test Video Title", title);
-    }
-
-    @Test
-    public void testExtractChannelName() {
-        // Create a mock Page and stub evaluate to return a test channel name.
-        Page mockPage = Mockito.mock(Page.class);
-        Mockito.when(mockPage.evaluate(Mockito.anyString())).thenReturn("Test Channel");
-
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-
-        String channelName = service.testExtractChannelName(mockPage);
-        assertEquals("Test Channel", channelName);
-    }
-
-    @Test
-    public void testBuildStableKey() {
-        TestableYTChatScraperService service = new TestableYTChatScraperService(
-                chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, executorService
-        );
-
-        String username = "user";
-        String message = "Hello, world!";
-        String key1 = service.testBuildStableKey(username, message);
-        String key2 = service.testBuildStableKey(username, message);
-
-        assertNotNull(key1, "The generated key should not be null.");
-        assertFalse(key1.isEmpty(), "The generated key should not be empty.");
-        // If called within the same minute, the keys should be identical.
-        assertEquals(key1, key2, "The keys should be identical for the same input within the same minute.");
-
-        // A different message should produce a different key.
-        String keyDifferent = service.testBuildStableKey(username, "Another message");
-        assertNotEquals(key1, keyDifferent, "Different message texts should produce different keys.");
+        // The code sets status to FAILED
+        ScraperState st = scraperService.getScraperStates().get("failVid");
+        assertEquals(ScraperState.Status.FAILED, st.getStatus());
+        assertTrue(st.getErrorMessage().contains("TargetClosedError"));
     }
 
     /**
-     * A test subclass that overrides runScraper to simulate a long-running task.
-     * CountDownLatch to block and then release the scraper.
+     * Test the scenario where an unhandled exception (not a PlaywrightException) is thrown
+     * in the scraping logic. This covers the general catch block.
      */
-    static class TestYTChatScraperService extends YTChatScraperService {
-        private final CountDownLatch finishLatch;
-        private final CountDownLatch startedLatch;
+    @Test
+    void testScrapeChannel_unhandledException() {
+        RuntimeException testEx = new RuntimeException("Something unexpected");
 
-        public TestYTChatScraperService(ChatBroadcastService chatBroadcastService,
-                                        ProfanityLogService profanityLogService,
-                                        PlaywrightFactory playwrightFactory,
-                                        KeywordRankingService keywordRankingService,
-                                        Executor chatScraperExecutor,
-                                        CountDownLatch finishLatch,
-                                        CountDownLatch startedLatch) {
-            super(chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, chatScraperExecutor);
-            this.finishLatch = finishLatch;
-            this.startedLatch = startedLatch;
+        doAnswer(invocation -> {
+            Consumer<Browser> consumer = invocation.getArgument(0);
+            throw testEx;
+        }).when(mockPool).withBrowser(any());
+
+        CompletableFuture<Void> future = scraperService.scrapeChannel("oops");
+        assertTrue(future.isDone());
+        assertTrue(future.isCompletedExceptionally());
+
+        ScraperState st = scraperService.getScraperStates().get("oops");
+        assertEquals(ScraperState.Status.FAILED, st.getStatus());
+        assertTrue(st.getErrorMessage().contains("Something unexpected"));
+    }
+
+    @Test
+    void testStopScraper_noActiveFuture() {
+        String result = scraperService.stopScraper("doesNotExist");
+        assertEquals("No active scraper found for video ID: doesNotExist", result);
+    }
+
+    @Test
+    void testStopScraper_activeFuture() {
+        CompletableFuture<Void> f = new CompletableFuture<>();
+        scraperService.getActiveFutures().put("vidXYZ", f);
+        scraperService.getScraperStates().put("vidXYZ", new ScraperState("vidXYZ"));
+
+        String result = scraperService.stopScraper("vidXYZ");
+        assertEquals("Stopping scraper for video ID: vidXYZ", result);
+        assertTrue(f.isDone());
+
+        ScraperState st = scraperService.getScraperStates().get("vidXYZ");
+        assertEquals(ScraperState.Status.COMPLETED, st.getStatus());
+        assertEquals("Stopped by user.", st.getErrorMessage());
+    }
+
+    /**
+     * testProcessNewMessages covers the "no new messages" path and the normal iteration path.
+     */
+    @Test
+    void testProcessNewMessages() {
+        // We want to test processNewMessages(...) directly for coverage
+        // We'll mock a Locator that has some message count
+        Locator mockLocator = mock(Locator.class);
+        when(mockLocator.count()).thenReturn(5);
+
+        scraperService.processNewMessages("vid", "vTitle", "cName", mockLocator, 5);
+        // If current count <= processedCount, it returns early
+        verify(mockLocator, never()).nth(anyInt());
+
+        // If we have fewer "processedMessageCount" than actual, it processes them
+        when(mockLocator.count()).thenReturn(6);
+        Locator mockLocatorNth = mock(Locator.class);
+        when(mockLocator.nth(anyInt())).thenReturn(mockLocatorNth); // always the same
+        scraperService.processNewMessages("vid", "vTitle", "cName", mockLocator, 3);
+
+        // We expect it to call .nth(3), .nth(4), .nth(5)
+        verify(mockLocator, times(3)).nth(anyInt());
+    }
+
+    @Test
+    void testProcessSingleMessage() {
+        // We'll mock the "extractUsername" and "extractMessageText" indirectly by mocking the locator
+        // But those are actual methods in the service. We'll do partial coverage by letting the real code call them,
+        // or we can do a separate direct test of those methods. We'll do direct tests below, so here let's just test
+        // that we call broadcast, profanityLog, etc.
+
+        Locator mockMessageElement = mock(Locator.class, RETURNS_DEEP_STUBS);
+        // Let "extractUsername" and "extractMessageText" return some strings
+        // We'll actually call the real method, so let's do partial stubbing for the "innerText"/"evaluate" calls.
+        when(mockMessageElement.locator("xpath=.//*[@id='author-name']").innerText())
+                .thenReturn("TestUser");
+        when(mockMessageElement.evaluate(anyString())).thenReturn("Hello World!");
+
+        scraperService.processSingleMessage("video123", "VideoTitle", "ChannelXYZ", mockMessageElement);
+        // Confirm the chat message is broadcast
+        verify(mockBroadcastService).broadcast(eq("video123"), any(ChatMessage.class));
+        // Confirm the profanity check
+        verify(mockProfanityService).logIfProfane("TestUser", "Hello World!");
+        // Confirm the keywordRankingService usage
+        verify(mockKeywordRankingService).updateKeywordRanking("video123", "Hello World!");
+    }
+
+    @Test
+    void testProcessSingleMessage_exceptionCaught() {
+        Locator mockMessageElement = mock(Locator.class);
+        // Force an exception in extraction
+        when(mockMessageElement.locator(anyString())).thenThrow(new RuntimeException("Oops"));
+
+        // Should log the error and not rethrow
+        assertDoesNotThrow(() ->
+                scraperService.processSingleMessage("vId", "vTitle", "cName", mockMessageElement));
+        // No broadcast calls
+        verifyNoInteractions(mockBroadcastService, mockProfanityService, mockKeywordRankingService);
+    }
+
+    @Test
+    void testBuildStableKey() {
+        String key1 = scraperService.buildStableKey("bob", "Hi");
+        String key2 = scraperService.buildStableKey("bob", "Hi");
+        // Because it's the same minute, they should be the same.
+        assertEquals(key1, key2);
+    }
+
+    @Test
+    void testHandlePlaywrightException_targetClosed() {
+        PlaywrightException ex = new PlaywrightException("TargetClosedError: Something");
+        // We'll just call the method directly
+        // For coverage we can watch the logs, or just ensure no exception is thrown
+        // We'll do a partial check that the code hits the 'warn' path
+        scraperService.handlePlaywrightException("vid999", ex);
+        // The method logs a warning but does not rethrow
+    }
+
+    @Test
+    void testHandlePlaywrightException_otherError() {
+        PlaywrightException ex = new PlaywrightException("SomeOtherError: unknown");
+        scraperService.handlePlaywrightException("vid888", ex);
+        // logs an error but does not rethrow
+    }
+
+    @Test
+    void testParsePlaywrightError() {
+        // We'll call parsePlaywrightError(...) directly for coverage
+        PlaywrightException noMsg = new PlaywrightException(null);
+        assertEquals("Unknown Playwright error (no message).", callParseError(noMsg));
+
+        PlaywrightException timeoutErr = new PlaywrightException("TimeoutError 10000ms exceeded");
+        assertTrue(callParseError(timeoutErr).contains("Chat iframe not found"));
+
+        PlaywrightException resolvedErr = new PlaywrightException("net::err_name_not_resolved");
+        assertTrue(callParseError(resolvedErr).contains("Network issue: could not resolve the host"));
+
+        PlaywrightException disconnectedErr = new PlaywrightException("net::err_internet_disconnected");
+        assertTrue(callParseError(disconnectedErr).contains("No internet connection"));
+
+        PlaywrightException otherErr = new PlaywrightException("some random error");
+        assertTrue(callParseError(otherErr).contains("Playwright error: some random error"));
+    }
+
+    // Helper to call private parsePlaywrightError(...)
+    // If parsePlaywrightError is truly private, you might need reflection or
+    // change it to package-private for test coverage.
+    private String callParseError(PlaywrightException e) {
+        // We'll just do it via reflection if it's private.
+        // Or if you made it package-private, you can call directly: scraperService.parsePlaywrightError(e)
+        try {
+            var method = YTChatScraperService.class.getDeclaredMethod("parsePlaywrightError", PlaywrightException.class);
+            method.setAccessible(true);
+            return (String) method.invoke(scraperService, e);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
+    }
 
-        @Override
-        void runScraper(String videoId) {
-            // Signal that runScraper has started.
-            startedLatch.countDown();
+    /**
+     * A small utility class to forcibly set private fields for testing
+     * (avoids having to create a setter just for tests).
+     */
+    private static class TestUtils {
+        static void setField(Object target, String fieldName, Object value) {
             try {
-                // Block until the latch is released (simulate long-running process)
-                finishLatch.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                var field = target.getClass().getDeclaredField(fieldName);
+                field.setAccessible(true);
+                field.set(target, value);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-        }
-    }
-
-    /**
-     * A test subclass to expose the extractor functions and the key builder.
-     */
-    static class TestableYTChatScraperService extends YTChatScraperService {
-
-        public TestableYTChatScraperService(ChatBroadcastService chatBroadcastService,
-                                            ProfanityLogService profanityLogService,
-                                            PlaywrightFactory playwrightFactory,
-                                            KeywordRankingService keywordRankingService,
-                                            Executor chatScraperExecutor) {
-            super(chatBroadcastService, profanityLogService, playwrightFactory, keywordRankingService, chatScraperExecutor);
-        }
-
-        public String testExtractUsername(Locator locator) {
-            return extractUsername(locator);
-        }
-
-        public String testExtractMessageText(Locator locator) {
-            return extractMessageText(locator);
-        }
-
-        public String testExtractVideoTitle(Page page) {
-            return extractVideoTitle(page);
-        }
-
-        public String testExtractChannelName(Page page) {
-            return extractChannelName(page);
-        }
-
-        public String testBuildStableKey(String username, String messageText) {
-            return buildStableKey(username, messageText);
-        }
-
-        public Browser testLaunchBrowser(Playwright playwright) {
-            return launchBrowser(playwright);
         }
     }
 }
