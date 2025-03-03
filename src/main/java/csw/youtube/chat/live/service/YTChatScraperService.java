@@ -4,8 +4,7 @@ import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
 import csw.youtube.chat.live.dto.ChatMessage;
 import csw.youtube.chat.live.model.ScraperState;
-import csw.youtube.chat.playwright.PlaywrightBrowserPool;
-import csw.youtube.chat.playwright.PlaywrightFactory;
+import csw.youtube.chat.playwright.PlaywrightBrowserManager;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
@@ -37,12 +36,11 @@ public class YTChatScraperService {
     public static final String YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v=";
     private static final int POLL_INTERVAL_MS = 1000;
     private static final int PLAYWRIGHT_TIMEOUT_MS = 10000; // For selectors and navigation
-
-    @Getter
-    private final Map<String, ScraperState> scraperStates = new ConcurrentHashMap<>();
     @Getter
     // Keep track of active scrapers: videoId -> future
     final Map<String, CompletableFuture<Void>> activeFutures = new ConcurrentHashMap<>();
+    @Getter
+    private final Map<String, ScraperState> scraperStates = new ConcurrentHashMap<>();
     @Getter
     // Map of videoId -> threadName (or some stable ID) for display
     private final Map<String, String> videoThreadNames = new ConcurrentHashMap<>();
@@ -57,10 +55,7 @@ public class YTChatScraperService {
     @Qualifier("chatScraperExecutor")
     private final Executor chatScraperExecutor;
 
-    /**
-     * Our new Browser pool for reusing heavyweight Playwright browser instances.
-     */
-    private final PlaywrightBrowserPool playwrightBrowserPool;
+    private final PlaywrightBrowserManager playwrightBrowserManager;
 
     @PreDestroy // have to use this after VT
     public void onDestroy() {
@@ -108,8 +103,7 @@ public class YTChatScraperService {
         chatScraperExecutor.execute(() -> {
             try {
                 // Borrow a Browser from the pool.
-                playwrightBrowserPool.withBrowser(browser -> {
-                    Page page = browser.newPage();
+                playwrightBrowserManager.withPage(page -> {
                     try {
                         // Navigate and wait for the chat iframe
                         String fullUrl = YOUTUBE_WATCH_URL + videoId;
@@ -151,31 +145,31 @@ public class YTChatScraperService {
 
                         // Inject a MutationObserver in the iframe
                         chatBodyLocator.evaluate("""
-                            () => {
-                                try {
-                                    const chatContainer = document.querySelector('div#items');
-                                    if (!chatContainer) {
-                                        console.error("Chat container not found");
-                                        return;
+                                    () => {
+                                        try {
+                                            const chatContainer = document.querySelector('div#items');
+                                            if (!chatContainer) {
+                                                console.error("Chat container not found");
+                                                return;
+                                            }
+                                            console.log("MutationObserver started");
+                                
+                                            // If there's an old observer, disconnect it
+                                            if (window._chatObserver) {
+                                                window._chatObserver.disconnect();
+                                            }
+                                
+                                            const observer = new MutationObserver(() => {
+                                                window._ytChatHandler_onNewMessages({});
+                                            });
+                                            observer.observe(chatContainer, { childList: true });
+                                            window._chatObserver = observer;
+                                            console.log("MutationObserver setup complete");
+                                        } catch (error) {
+                                            console.error("Observer setup failed", error);
+                                        }
                                     }
-                                    console.log("MutationObserver started");
-
-                                    // If there's an old observer, disconnect it
-                                    if (window._chatObserver) {
-                                        window._chatObserver.disconnect();
-                                    }
-
-                                    const observer = new MutationObserver(() => {
-                                        window._ytChatHandler_onNewMessages({});
-                                    });
-                                    observer.observe(chatContainer, { childList: true });
-                                    window._chatObserver = observer;
-                                    console.log("MutationObserver setup complete");
-                                } catch (error) {
-                                    console.error("Observer setup failed", error);
-                                }
-                            }
-                        """);
+                                """);
 
                         // Schedule a periodic throughput log
                         try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {

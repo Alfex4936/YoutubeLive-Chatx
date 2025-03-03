@@ -21,6 +21,7 @@ public class AsyncConfig {
         ThreadFactory vtFactory = Thread.ofVirtual()
                 .name("yt-scraper-", 0)
                 .factory();
+        // One new virtual thread per task
         return Executors.newThreadPerTaskExecutor(vtFactory);
     }
 
