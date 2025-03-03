@@ -75,7 +75,7 @@ public class YTChatScraperServiceTest {
         future1.get(2, TimeUnit.SECONDS);
 
         // After completion, the activeScrapers map should no longer contain the videoId.
-        assertFalse(service.activeScrapers.containsKey(videoId),
+        assertFalse(service.activeFutures.containsKey(videoId),
                 "Active scrapers map should not contain the videoId after the scraper completes.");
     }
 
@@ -109,7 +109,7 @@ public class YTChatScraperServiceTest {
         assertTrue(startedLatch.await(2, TimeUnit.SECONDS), "Not all scrapers started in time.");
 
         // Verify that the activeScrapers map contains all three scrapers.
-        assertEquals(scraperCount, service.activeScrapers.size(), "Active scrapers map should contain all scrapers.");
+        assertEquals(scraperCount, service.activeFutures.size(), "Active scrapers map should contain all scrapers.");
 
         // Release all scrapers so they can complete.
         finishLatch.countDown();
@@ -118,7 +118,7 @@ public class YTChatScraperServiceTest {
         CompletableFuture.allOf(futures).get(2, TimeUnit.SECONDS);
 
         // After all scrapers have finished, the activeScrapers map should be empty.
-        assertTrue(service.activeScrapers.isEmpty(), "Active scrapers map should be empty after all scrapers finish.");
+        assertTrue(service.activeFutures.isEmpty(), "Active scrapers map should be empty after all scrapers finish.");
     }
 
     @Test
@@ -142,12 +142,12 @@ public class YTChatScraperServiceTest {
 
         // Create an active scraper future and put it into the activeScrapers map.
         CompletableFuture<Void> future = new CompletableFuture<>();
-        service.activeScrapers.put(videoId, future);
+        service.activeFutures.put(videoId, future);
 
         String result = service.stopScraper(videoId);
         assertEquals("Stopping scraper for video ID: " + videoId, result);
         // The active scraper should be removed.
-        assertFalse(service.activeScrapers.containsKey(videoId));
+        assertFalse(service.activeFutures.containsKey(videoId));
         // The future should be completed.
         assertTrue(future.isDone());
     }

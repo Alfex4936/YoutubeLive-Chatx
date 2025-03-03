@@ -53,16 +53,18 @@ public class KeywordRankingService {
             log.error("Failed to load ignorekeywords.txt: {}", e.getMessage(), e);
         }
 
-        // Add a comprehensive list of extra English stop words.
+        // English stop words.
         ignoreKeywords.addAll(List.of(
-                "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
+                "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z",
+                "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+                "me", "my", "myself", "we", "our", "ours", "ourselves",
                 "you", "your", "yours", "yourself", "yourselves",
                 "he", "him", "his", "himself", "she", "her", "hers", "herself",
                 "it", "its", "itself", "they", "them", "their", "theirs", "themselves",
                 "what", "which", "who", "whom", "this", "that", "these", "those",
                 "am", "is", "are", "was", "were", "be", "been", "being",
                 "have", "has", "had", "having", "do", "does", "did", "doing",
-                "a", "an", "the",
+                "an", "the",
                 "and", "but", "if", "or", "because", "as", "until", "while",
                 "of", "at", "by", "for", "with", "about", "against", "between",
                 "into", "through", "during", "before", "after", "above", "below",
@@ -75,8 +77,10 @@ public class KeywordRankingService {
                 "yours", "yours'", "don't", "dont", "~", "...", ".", "yea", "yeah", "ok", "okie", "okay"
         ));
 
-        // Add a comprehensive list of Korean stop words (examples).
+        // Korean stop words.
         ignoreKeywords.addAll(List.of(
+                "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+                "ㅏ", "ㅑ", "ㅓ", "ㅕ", "ㅗ", "ㅛ", "ㅜ", "ㅠ", "ㅡ", "ㅣ", "ㅐ", "ㅒ", "ㅔ", "ㅖ", "ㅘ", "ㅙ", "ㅚ", "ㅝ", "ㅞ", "ㅟ", "ㅢ",
                 "이", "그", "저", "것", "수", "들", "등", "에서", "에게", "으로",
                 "하다", "이다", "입니다", "있다", "없다", "그리고", "하지만", "그러나",
                 "때문", "그래서", "만약", "만", "뿐", "의", "를", "은", "는", "이야",

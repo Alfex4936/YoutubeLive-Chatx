@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Scraper Monitor</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1em;
+        }
+
+        th, td {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+        }
+
+        th {
+            background: #f2f2f2;
+        }
+
+        .msg {
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            margin-bottom: 1em;
+        }
+
+        h1, h2 {
+            margin-bottom: 0.4em;
+        }
+
+        form {
+            margin-bottom: 2em;
+        }
+
+        label {
+            margin-right: 0.5em;
+        }
+
+        .btn-link {
+            color: #1a0dab;
+            text-decoration: none;
+        }
+
+        .btn-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Status-based styling */
+        .status-running {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-failed {
+            color: red;
+            font-weight: bold;
+        }
+
+        .status-completed {
+            color: #888;
+            font-style: italic;
+        }
+
+        .error-msg {
+            color: red;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>YouTube Chat Scrapers</h1>
+
+    <div th:if="${message}" class="msg" th:text="${message}"></div>
+
+    <div th:if="${scraperStatesEmpty}">
+        <p>No scrapers at the moment.</p>
+    </div>
+
+    <table th:unless="${scraperStatesEmpty}">
+        <thead>
+        <tr>
+            <th>Video ID</th>
+            <th>Status</th>
+            <th>Thread</th>
+            <th>Error</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <!-- scraperStates is Map<videoId, ScraperState> -->
+        <tr th:each="entry : ${scraperStates}">
+            <!-- entry.key = videoId, entry.value = ScraperState -->
+            <td>
+                <a th:href="|https://www.youtube.com/watch?v=${entry.key}|" target="_blank"
+                   th:text="${entry.key}">VideoId</a>
+            </td>
+            <td>
+                <span th:classappend="${'status-' + entry.value.status.name().toLowerCase()}"
+                      th:text="${entry.value.status}">
+                Status</span>
+            </td>
+            <td th:text="${entry.value.threadName}">Thread Name</td>
+            <td>
+                <!-- Show error ONLY if status == FAILED -->
+                <span th:if="${entry.value.status.name()} == 'FAILED'"
+                      th:text="${
+                        entry.value.errorMessage.length() > 150
+                            ? #strings.substring(entry.value.errorMessage, 0, 150).concat('...')
+                            : entry.value.errorMessage
+                      }"
+                      class="error-msg">
+                    -
+                </span>
+            </td>
+
+            <td>
+                <!-- Show "Stop" only if RUNNING -->
+                <!--/*@thymesVar id="ScraperState"*/-->
+                <a th:if="${entry.value.status.name()} == 'RUNNING'" th:href="@{/stop-scraper(videoId=${entry.key})}"
+                   class="btn-link">Stop</a>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <hr/>
+    <h2>Start a New Scraper</h2>
+    <form th:action="@{/start-scraper}" method="get">
+        <label for="videoId">Video ID or URL:</label>
+        <input type="text" id="videoId" name="videoId"/>
+        <button type="submit">Start Scraper</button>
+    </form>
+</div>
+</body>
+</html>

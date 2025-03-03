@@ -1,13 +1,13 @@
 package csw.youtube.chat.live.service;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
 import csw.youtube.chat.live.dto.ChatMessage;
+import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.playwright.PlaywrightFactory;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
 import jakarta.annotation.PreDestroy;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -35,23 +35,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class YTChatScraperService {
 
     public static final String YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v=";
-    private static final int MESSAGE_CACHE_MAX_SIZE = 5_000;
-    private static final int MESSAGE_CACHE_EXPIRY_MINUTES = 10;
     private static final int POLL_INTERVAL_MS = 1000;
-    private static final int PLAYWRIGHT_TIMEOUT_MS = 15000; // For selectors and navigation
-    /**
-     * Tracks active scrapers by videoId.
-     * The value is a {@link CompletableFuture} that represents the running scraper task.
-     * Using ConcurrentHashMap for thread-safe access.
-     */
-    final Map<String, CompletableFuture<Void>> activeScrapers = new ConcurrentHashMap<>();
-    /**
-     * For deduplication of processed messages, we store one Guava Cache per videoId.
-     * - Maximum {@value MESSAGE_CACHE_MAX_SIZE} entries
-     * - Evict after {@value MESSAGE_CACHE_EXPIRY_MINUTES} minutes
-     * Using ConcurrentHashMap for thread-safe access to caches.
-     */
-    final Map<String, Cache<String, Boolean>> perVideoMessageCache = new ConcurrentHashMap<>();
+    private static final int PLAYWRIGHT_TIMEOUT_MS = 10000; // For selectors and navigation
+
+    @Getter
+    private final Map<String, ScraperState> scraperStates = new ConcurrentHashMap<>();
+    @Getter
+    // Keep track of active scrapers: videoId -> future
+    final Map<String, CompletableFuture<Void>> activeFutures = new ConcurrentHashMap<>();
+    @Getter
+    // Map of videoId -> threadName (or some stable ID) for display
+    private final Map<String, String> videoThreadNames = new ConcurrentHashMap<>();
+
+
     private final ChatBroadcastService chatBroadcastService;
     private final ProfanityLogService profanityLogService;
     private final PlaywrightFactory playwrightFactory;
@@ -65,32 +61,14 @@ public class YTChatScraperService {
     @PreDestroy // have to use this after VT
     public void onDestroy() {
         // Stop all active scrapers so they don’t queue new tasks
-        activeScrapers.keySet().forEach(this::stopScraper);
-    }
-
-    /**
-     *
-     * Returns or creates an LRU+time-based cache for the given videoId.
-     * This cache is used to deduplicate messages and prevent reprocessing.
-     *
-     * @param videoId The YouTube video ID.
-     * @return The message cache for the given videoId.
-     * @DEPRECATED we don't need this anymore in favor of MutationObserver.
-     */
-    Cache<String, Boolean> getMessageCache(String videoId) {
-        return perVideoMessageCache.computeIfAbsent(videoId, _ ->
-                CacheBuilder.newBuilder()
-                        .maximumSize(MESSAGE_CACHE_MAX_SIZE)
-                        .expireAfterWrite(MESSAGE_CACHE_EXPIRY_MINUTES, TimeUnit.MINUTES)
-                        .build()
-        );
+        activeFutures.keySet().forEach(this::stopScraper);
     }
 
     /**
      * Starts scraping chat messages for a given YouTube video ID if a scraper is not already active.
      * This method is fully asynchronous (via @Async on a Virtual Thread executor) and will not block
      * the calling thread. It returns a CompletableFuture representing the ongoing scrape.
-     *
+     * <p>
      * To stop the scraper, either complete or cancel this future externally.
      *
      * @param videoId The YouTube video ID to scrape.
@@ -103,14 +81,23 @@ public class YTChatScraperService {
             throw new IllegalArgumentException("Video ID cannot be null or empty.");
         }
 
-        if (activeScrapers.containsKey(videoId)) {
+        if (activeFutures.containsKey(videoId)) {
             log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
             return CompletableFuture.completedFuture(null);
         }
 
+        // Create the state object
+        ScraperState state = new ScraperState(videoId);
+        state.setStatus(ScraperState.Status.RUNNING);
+        scraperStates.put(videoId, state);
+
         log.info("Starting chat scraper for video ID: {}", videoId);
         CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
-        activeScrapers.put(videoId, scraperFuture);
+        activeFutures.put(videoId, scraperFuture);
+
+        String threadName = Thread.currentThread().getName();
+        videoThreadNames.put(videoId, threadName);
+        state.setThreadName(threadName);
 
         // All logic is in this try-block so we don't need an extra runScraper() method
         try (Playwright playwright = playwrightFactory.create();
@@ -142,7 +129,7 @@ public class YTChatScraperService {
 
             // Expose Java function that the browser can call when new messages appear
             iframePage.evaluate("window._ytChatHandler = {}");
-            iframePage.exposeFunction("_ytChatHandler_onNewMessages", args -> {
+            iframePage.exposeFunction("_ytChatHandler_onNewMessages", _ -> {
                 try {
                     int newMessages = chatMessagesLocator.count();
                     int previousCount = totalMessages.get();
@@ -193,36 +180,52 @@ public class YTChatScraperService {
                         }
                     """);
 
+            // TODO do we need resource?
             // Throughput logging: Every 10 seconds, log messages per interval
-            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-            ScheduledFuture<?> logTask = scheduler.scheduleAtFixedRate(() -> {
-                int count = messagesPerInterval.getAndSet(0); // Reset the counter after logging
-                log.info("📊 Throughput: {} messages processed in the last 10 seconds for video {}", count, videoId);
-            }, 10, 10, TimeUnit.SECONDS); // Logs every 10 seconds
+            try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {
+                ScheduledFuture<?> logTask = scheduler.scheduleAtFixedRate(() -> {
+                    int count = messagesPerInterval.getAndSet(0); // Reset the counter after logging
+                    log.info("📊 Throughput: {} messages processed in the last 10 seconds for video {}", count, videoId);
+                }, 10, 10, TimeUnit.SECONDS); // Logs every 10 seconds
 
 
-            // Keep the scraper running until the user signals it is done (scraperFuture completed)
-            while (!scraperFuture.isDone()) {
-                // Let Playwright handle any pending events.
-                // MutationObserver triggers `_ytChatHandler_onNewMessages` promptly.
-                page.waitForTimeout(1000);
+                // Keep the scraper running until the user signals it is done (scraperFuture completed)
+                while (!scraperFuture.isDone()) {
+                    // Let Playwright handle any pending events.
+                    // MutationObserver triggers `_ytChatHandler_onNewMessages` promptly.
+                    page.waitForTimeout(POLL_INTERVAL_MS);
+                }
+
+                logTask.cancel(false);
+                scheduler.shutdown();
             }
 
-            logTask.cancel(false);
-            scheduler.shutdown();
             // Once we exit the loop, we assume someone else completed the future.
             if (!scraperFuture.isCompletedExceptionally()) {
                 scraperFuture.complete(null);
+                state.setStatus(ScraperState.Status.COMPLETED);
                 log.info("Scraper for video {} completed normally.", videoId);
             }
 
+        } catch (PlaywrightException pwe) {
+            // E.g. if iframe doesn't appear in time, or no live chat
+            log.error("Playwright error for videoId={}: {}", videoId, pwe.getMessage(), pwe);
+            scraperFuture.completeExceptionally(pwe);
+            state.setStatus(ScraperState.Status.FAILED);
+
+            // Parse the error for a friendlier explanation:
+            String userFriendlyMsg = parsePlaywrightError(pwe);
+            state.setErrorMessage(userFriendlyMsg);
+
         } catch (Exception e) {
-            // If any top-level error occurs, complete the future with an exception
-            log.error("Error in scraping logic for video {}: {}", videoId, e.getMessage(), e);
+            log.error("Error in scraping logic for videoId={}: {}", videoId, e.getMessage(), e);
             scraperFuture.completeExceptionally(e);
+            state.setStatus(ScraperState.Status.FAILED);
+            state.setErrorMessage("General error: " + e.getMessage());
         } finally {
             // Clean up from the activeScrapers map
-            activeScrapers.remove(videoId);
+            activeFutures.remove(videoId);
+            videoThreadNames.remove(videoId);
             log.info("Finished or aborted scraping session for video {}", videoId);
         }
 
@@ -238,12 +241,18 @@ public class YTChatScraperService {
      * @return A message indicating the status of the stop operation.
      */
     public String stopScraper(String videoId) {
-        CompletableFuture<Void> future = activeScrapers.remove(videoId);
+        CompletableFuture<Void> future = activeFutures.remove(videoId);
         if (future == null) {
             return "No active scraper found for video ID: " + videoId;
         }
         // Forcibly interrupt the thread if needed (currently CompletableFuture.complete(null) just signals completion)
         future.complete(null); // Signal to stop, actual thread interruption/resource release needs to be handled in runScraper if needed.
+
+        ScraperState state = scraperStates.get(videoId);
+        if (state != null) {
+            state.setStatus(ScraperState.Status.COMPLETED);
+            state.setErrorMessage("Stopped by user.");
+        }
         log.info("Stopping scraper requested for video ID: {}", videoId);
         return "Stopping scraper for video ID: " + videoId;
     }
@@ -291,7 +300,7 @@ public class YTChatScraperService {
         try {
             String username = extractUsername(messageElement);
             String messageText = extractMessageText(messageElement);
-            String stableKey = buildStableKey(username, messageText);
+            // String stableKey = buildStableKey(username, messageText);
             log.debug("{}: {}", username, messageText);
 
 //            if (messageCache.getIfPresent(stableKey) != null) {
@@ -397,13 +406,27 @@ public class YTChatScraperService {
         }
     }
 
-    void handleInterruptedException(String videoId, InterruptedException ie) {
-        log.info("Scraper thread interrupted for video {}. Shutting down gracefully.", videoId);
-        // Cleanup if necessary (resources are managed by try-with-resources)
-    }
+    private String parsePlaywrightError(PlaywrightException e) {
+        String rawMsg = e.getMessage();
+        if (rawMsg == null) {
+            return "Unknown Playwright error (no message).";
+        }
+        String lowerMsg = rawMsg.toLowerCase();
 
-    void handleGeneralException(String videoId, Exception e) {
-        log.error("Error while processing chat messages for video {}: {}", videoId, e.getMessage(), e);
+        if (lowerMsg.contains("timeouterror") || lowerMsg.contains("timeout 10000ms exceeded")) {
+            // This likely means the chat iframe didn't appear in time
+            return "Chat iframe not found. The video may not be live or chat is disabled.";
+        }
+        if (lowerMsg.contains("net::err_name_not_resolved")) {
+            return "Network issue: could not resolve the host. Check your internet connection or URL.";
+        }
+        if (lowerMsg.contains("net::err_internet_disconnected")) {
+            return "No internet connection, or YouTube is unreachable.";
+        }
+        // Add more cases as needed...
+
+        // Fallback if none of the above patterns match:
+        return "Playwright error: " + rawMsg;
     }
 
 }

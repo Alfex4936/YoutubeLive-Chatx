@@ -23,6 +23,9 @@ java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(23)
 	}
+
+	sourceCompatibility = JavaVersion.VERSION_23
+	targetCompatibility = JavaVersion.VERSION_23
 }
 
 configurations {
@@ -40,6 +43,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-websocket")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
 //	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
 	// https://mvnrepository.com/artifact/org.redisson/redisson-spring-boot-starter
