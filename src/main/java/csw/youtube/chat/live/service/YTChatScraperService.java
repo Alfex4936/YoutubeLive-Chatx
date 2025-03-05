@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Service for scraping YouTube Live Chat messages for a given video ID.
  * <p>
+ * TODO Auto-stop low-activity scrapers (like `totalMessages < 3`)
+ * TODO Auto-clean COMPLETED/FAILED scrapers (scheduling)
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -154,6 +157,7 @@ public class YTChatScraperService {
         String threadName = Thread.currentThread().getName();
         videoThreadNames.put(videoId, threadName);
         state.setThreadName(threadName);
+        state.setCreatedAt(Instant.now());
 
         log.info("Starting chat scraper for video ID: {}", videoId);
         return state;

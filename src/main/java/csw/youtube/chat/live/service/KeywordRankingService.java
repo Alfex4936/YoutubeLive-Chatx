@@ -1,6 +1,7 @@
 package csw.youtube.chat.live.service;
 
 
+import csw.youtube.chat.live.dto.KeywordRankingPair;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,7 +68,7 @@ public class KeywordRankingService {
                 "what", "which", "who", "whom", "this", "that", "these", "those",
                 "am", "is", "are", "was", "were", "be", "been", "being",
                 "have", "has", "had", "having", "do", "does", "did", "doing",
-                "an", "the",
+                "an", "the", "hi", "yo",
                 "and", "but", "if", "or", "because", "as", "until", "while",
                 "of", "at", "by", "for", "with", "about", "against", "between",
                 "into", "through", "during", "before", "after", "above", "below",
@@ -140,7 +141,7 @@ public class KeywordRankingService {
         return redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, k - 1);
     }
 
-    public List<Pair<String, Double>> getTopKeywordStrings(String videoId, int k) {
+    public List<KeywordRankingPair> getTopKeywordStrings(String videoId, int k) {
         String key = "video:" + videoId + ":keywords";
         Set<ZSetOperations.TypedTuple<String>> typedTuples =
                 redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, k - 1);
@@ -151,7 +152,7 @@ public class KeywordRankingService {
         }
 
         return typedTuples.stream()
-                .map(tuple -> Pair.of(tuple.getValue(), tuple.getScore())) // Extract keyword + score
+                .map(tuple -> new KeywordRankingPair(tuple.getValue(), tuple.getScore())) // Extract keyword + score
                 .collect(Collectors.toList());
     }
 

@@ -1,14 +1,15 @@
 package csw.youtube.chat.playwright;
 
+import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.KeywordRankingService;
 import csw.youtube.chat.live.service.YTChatScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
-import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,7 @@ public class ScraperStatsEndpoint {
             ScraperState state = entry.getValue();
 
             // Retrieve top 5 keywords
-            List<Pair<String, Double>> topKeywordsWithScores = keywordRankingService.getTopKeywordStrings(videoId, 5);
+            List<KeywordRankingPair> topKeywordsWithScores = keywordRankingService.getTopKeywordStrings(videoId, 5);
 
             ScraperMetrics metrics = new ScraperMetrics(
                     state.getVideoTitle(),
@@ -45,6 +46,7 @@ public class ScraperStatsEndpoint {
                     state.getTotalMessages().get(),
                     topKeywordsWithScores,
                     state.getThreadName(),
+                    state.getCreatedAt(),
                     state.getErrorMessage()
             );
             statsMap.put(videoId, metrics);
@@ -65,8 +67,9 @@ public class ScraperStatsEndpoint {
             int maxThroughput,
             double averageThroughput,
             long totalMessages,
-            List<Pair<String, Double>> topKeywords,
+            List<KeywordRankingPair> topKeywords,
             String threadName,
+            Instant createdAt,
             String errorMessage
     ) {
     }
