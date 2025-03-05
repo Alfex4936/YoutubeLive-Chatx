@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -14,10 +15,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -98,6 +101,13 @@ public class KeywordRankingService {
      * @param message The chat message text.
      */
     public void updateKeywordRanking(String videoId, String message) {
+        if (message.length() < 3) {
+            return; // Skip short messages
+        }
+        if (isNumeric(message)) {
+            return; // Skip numeric messages
+        }
+
         String key = "video:" + videoId + ":keywords";
         // Basic tokenization (consider more robust parsing if needed)
         String[] words = message.split("\\s+");
@@ -128,5 +138,52 @@ public class KeywordRankingService {
     public Set<ZSetOperations.TypedTuple<String>> getTopKeywords(String videoId, int k) {
         String key = "video:" + videoId + ":keywords";
         return redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, k - 1);
+    }
+
+    public List<Pair<String, Double>> getTopKeywordStrings(String videoId, int k) {
+        String key = "video:" + videoId + ":keywords";
+        Set<ZSetOperations.TypedTuple<String>> typedTuples =
+                redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, k - 1);
+
+        // If null or empty, return an empty list
+        if (typedTuples == null || typedTuples.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return typedTuples.stream()
+                .map(tuple -> Pair.of(tuple.getValue(), tuple.getScore())) // Extract keyword + score
+                .collect(Collectors.toList());
+    }
+
+    public static boolean isNumeric(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+
+        int len = str.length();
+        int i = 0;
+        boolean hasDecimal = false;
+
+        // Handle negative sign
+        if (str.charAt(i) == '-') {
+            i++; // Skip the negative sign
+            if (i >= len) return false; // "-" alone is not valid
+        }
+
+        // Check remaining characters
+        while (i < len) {
+            char c = str.charAt(i);
+            if (c >= '0' && c <= '9') {
+                // Digit is fine
+            } else if (c == '.' && !hasDecimal) {
+                hasDecimal = true; // Allow one decimal point
+                if (i + 1 >= len) return false; // "." must be followed by a digit
+            } else {
+                return false; // Invalid character
+            }
+            i++;
+        }
+
+        return true;
     }
 }

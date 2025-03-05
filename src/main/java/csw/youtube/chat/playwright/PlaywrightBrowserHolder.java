@@ -53,7 +53,7 @@ public class PlaywrightBrowserHolder implements AutoCloseable {
                         .setTimeout(30000)
                         .setIgnoreDefaultArgs(List.of("--enable-automation"))
                         .setSlowMo(0)
-                        .setDownloadsPath(Paths.get("/tmp/downloads"))
+                        // .setDownloadsPath(Paths.get("/tmp/downloads"))
         );
         log.info("Created new PlaywrightBrowserHolder instance");
     }
