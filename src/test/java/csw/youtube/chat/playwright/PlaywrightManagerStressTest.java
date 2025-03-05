@@ -63,7 +63,7 @@ class PlaywrightManagerStressTest {
                     usedMemoryMB, maxMemoryMB, systemCpuLoad);
 
             // Decide if "overloaded" (arbitrary thresholds).
-            if (systemCpuLoad > 85.0 || usedMemoryMB > (maxMemoryMB * 0.8)) {
+            if (systemCpuLoad > 90.0 || usedMemoryMB > (maxMemoryMB * 0.8)) {
                 systemOverloaded = true;
             } else {
                 concurrentTests += 5;  // Increase concurrency step

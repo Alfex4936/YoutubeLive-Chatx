@@ -36,7 +36,7 @@ public class PlaywrightBrowserManager {
         PlaywrightBrowserHolder holder = getOrCreateHolder();
 
         Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
-                .setViewportSize(700, 700)
+                .setViewportSize(1280, 720)
                 .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/133.0.0 Safari/537.36")
                 .setJavaScriptEnabled(true);
 

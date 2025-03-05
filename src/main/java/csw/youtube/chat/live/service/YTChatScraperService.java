@@ -1,6 +1,9 @@
 package csw.youtube.chat.live.service;
 
-import com.microsoft.playwright.*;
+import com.microsoft.playwright.FrameLocator;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.options.LoadState;
 import csw.youtube.chat.live.dto.ChatMessage;
 import csw.youtube.chat.live.model.ScraperState;
@@ -14,9 +17,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -25,8 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Service for scraping YouTube Live Chat messages for a given video ID.
  * <p>
- * This service borrows a Browser from {@link PlaywrightBrowserPool}, navigates to the chat iframe,
- * and processes messages in a loop. It also handles message broadcast, profanity logging, etc.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -130,49 +129,118 @@ public class YTChatScraperService {
 
                         // Expose a JS function that notifies us of new chat messages
                         iframePage.evaluate("window._ytChatHandler = {}");
-                        iframePage.exposeFunction("_ytChatHandler_onNewMessages", ignored -> {
-                            int newMessagesCount = chatMessagesLocator.count();
-                            int oldCount = totalMessages.get();
-                            if (newMessagesCount > oldCount) {
-                                int messagesAdded = newMessagesCount - oldCount;
-                                totalMessages.set(newMessagesCount);
-                                messagesPerInterval.addAndGet(messagesAdded);
+                        iframePage.evaluate("""
+                                    () => {
+                                        try {
+                                            const iframe = document.querySelector("iframe#chatframe");
+                                            if (iframe) {
+                                                const chatDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                                const chatContainer = chatDoc.querySelector("div#item-scroller");
+                                                if (!chatContainer) {
+                                                    console.error("❌ Chat container not found.");
+                                                    return;
+                                                }
+                                                console.log("✅ Keeping chat active...");
+                                    
+                                                // 🟢 Trick YouTube into thinking the tab is active
+                                                setInterval(() => {
+                                                    document.dispatchEvent(new Event("visibilitychange")); // Fake visibility change
+                                                    window.dispatchEvent(new Event("focus")); // Fake focus event
+                                                }, 5000);
+                                    
+                                                // 🟢 Ensure chat is always scrolled to the bottom
+                                                setInterval(() => {
+                                                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                                                }, 3000);
+                                    
+                                                // 🟢 Fake user activity (mouse movement)
+                                                setInterval(() => {
+                                                    document.dispatchEvent(new MouseEvent("mousemove"));
+                                                }, 10000);
+                                            }
+                                
+                                        } catch (error) {
+                                            console.error("❌ Error keeping chat active:", error);
+                                        }
+                                    }
+                                """);
 
-                                processNewMessages(videoId, videoTitle, channelName, chatMessagesLocator, oldCount);
-                            }
+                        iframePage.exposeFunction("_ytChatHandler_onNewMessages", (args) -> {
+                            String username = (String) args[0];
+                            String messageText = (String) args[1];
+                            log.info("[{}]: {}", username, messageText);
+                            messagesPerInterval.addAndGet(1);
+                            // ChatMessage chatMessage = new ChatMessage(videoTitle, channelName, videoId, UUID.randomUUID().toString(), username, messageText, System.currentTimeMillis());
+                            profanityLogService.logIfProfane(username, messageText);
+                            keywordRankingService.updateKeywordRanking(videoId, messageText);
                             return null;
                         });
 
                         // Inject a MutationObserver in the iframe
                         chatBodyLocator.evaluate("""
-                                    () => {
-                                        try {
-                                            const chatContainer = document.querySelector('div#items');
-                                            if (!chatContainer) {
-                                                console.error("Chat container not found");
-                                                return;
-                                            }
-                                            console.log("MutationObserver started");
-                                
-                                            // If there's an old observer, disconnect it
-                                            if (window._chatObserver) {
-                                                window._chatObserver.disconnect();
-                                            }
-                                
-                                            const observer = new MutationObserver(() => {
-                                                window._ytChatHandler_onNewMessages({});
-                                            });
-                                            observer.observe(chatContainer, { childList: true });
-                                            window._chatObserver = observer;
-                                            console.log("MutationObserver setup complete");
-                                        } catch (error) {
-                                            console.error("Observer setup failed", error);
-                                        }
+                            () => {
+                                try {
+                                    // Define the extractMessageData function
+                                    function extractMessageData(messageElement) {
+                                         const username = messageElement.querySelector("#author-name")?.innerText.trim() || "Unknown User";
+                                         const container = messageElement.shadowRoot\s
+                                             ? messageElement.shadowRoot.querySelector('#message')\s
+                                             : messageElement.querySelector('#message');
+                                         if (!container) return { username, messageText: '' };
+                        
+                                         let messageText = '';
+                                         Array.from(container.childNodes).forEach(node => {
+                                             if (node.nodeType === Node.TEXT_NODE) {
+                                                 messageText += node.textContent;
+                                             } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'img') {
+                                                 const emoji = node.getAttribute('shared-tooltip-text') || node.getAttribute('alt') || '';
+                                                 messageText += emoji;
+                                             }
+                                         });
+                                         return { username, messageText };
+                                     }
+                        
+                                    // Find the chat container
+                                    const chatContainer = document.querySelector('div#items');
+                                    if (!chatContainer) {
+                                        console.error("Chat container not found");
+                                        return;
                                     }
-                                """);
+                                    console.log("MutationObserver started");
+                        
+                                    // Disconnect any existing observer
+                                    if (window._chatObserver) {
+                                        window._chatObserver.disconnect();
+                                    }
+                        
+                                    // Set up the MutationObserver
+                                    const observer = new MutationObserver((mutations) => {
+                                        // console.log("🔔 New chat messages detected!");
+                                        mutations.forEach(mutation => {
+                                            mutation.addedNodes.forEach(node => {
+                                                // Check if the node is a chat message element
+                                                if (node.nodeType === Node.ELEMENT_NODE && node.matches("yt-live-chat-text-message-renderer")) {
+                                                    // Extract data using the function
+                                                    const { username, messageText } = extractMessageData(node);
+                                                    // Pass the extracted data to the exposed function
+                                                    window._ytChatHandler_onNewMessages(username, messageText);
+                                                }
+                                            });
+                                        });
+                                    });
+                        
+                                    // Start observing the chat container
+                                    observer.observe(chatContainer, { childList: true });
+                                    window._chatObserver = observer;
+                                    console.log("MutationObserver setup complete");
+                                } catch (error) {
+                                    console.error("Observer setup failed", error);
+                                }
+                            }
+                        """);
 
                         // Schedule a periodic throughput log
-                        try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {
+                        try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory())) {
                             ScheduledFuture<?> logTask = scheduler.scheduleAtFixedRate(
                                     () -> {
                                         int count = messagesPerInterval.getAndSet(0);
@@ -182,11 +250,13 @@ public class YTChatScraperService {
 
                             // Keep scraping until the future completes (stopScraper() or external cancel)
                             while (!scraperFuture.isDone()) {
+                                // log.debug("Scraper for videoId={} is alive, waiting for new messages...", videoId);
+
                                 page.waitForTimeout(POLL_INTERVAL_MS);
                             }
 
                             // Cancel the throughput logging
-                            logTask.cancel(false);
+                            // logTask.cancel(false);
                             scheduler.shutdown();
                         }
 
@@ -255,47 +325,14 @@ public class YTChatScraperService {
         return "Stopping scraper for video ID: " + videoId;
     }
 
-    Browser launchBrowser(Playwright playwright) {
-        log.debug("Launching browser instance.");
-        return playwright.chromium().launch(
-                new BrowserType.LaunchOptions()
-                        .setHeadless(true)
-                        .setArgs(List.of(
-                                "--no-sandbox",
-                                "--disable-extensions",
-                                "--disable-gpu",
-                                "--disable-dev-shm-usage",
-                                "--disable-setuid-sandbox",
-                                "--single-process", // Reduces memory but may affect stability
-                                "--no-zygote", // Helps with memory usage
-                                "--disable-accelerated-2d-canvas", // Reduces GPU memory usage
-                                "--disable-web-security", // If you don't need same-origin policy
-                                "--disable-background-networking", // Reduces network activity
-                                "--disable-default-apps",
-                                "--disable-sync",
-                                "--disable-translate",
-                                "--hide-scrollbars",
-                                "--metrics-recording-only",
-                                "--mute-audio",
-                                "--no-first-run",
-                                "--disable-backgrounding-occluded-windows",
-                                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
-                        ))
-                        .setTimeout(30000) // Set timeout for browser operations
-                        .setIgnoreDefaultArgs(List.of("--enable-automation")) // Hide automation
-                        .setSlowMo(0) // Set to higher value for debugging
-                        .setDownloadsPath(Paths.get("/tmp/downloads")) // Centralized download path
-        );
-    }
-
     private void waitForChatIframe(Page page) {
-        log.debug("Waiting for chat iframe to appear.");
         page.waitForSelector("iframe#chatframe", new Page.WaitForSelectorOptions().setTimeout(PLAYWRIGHT_TIMEOUT_MS));
+        log.debug("Waited for chat iframe to appear.");
     }
 
     private void waitForInitialMessages(Locator chatMessagesLocator) {
-        log.debug("Waiting for initial chat messages to load.");
         chatMessagesLocator.first().waitFor(new Locator.WaitForOptions().setTimeout(PLAYWRIGHT_TIMEOUT_MS));
+        log.debug("Waited for initial chat messages to load.");
     }
 
 
@@ -326,7 +363,7 @@ public class YTChatScraperService {
 //            messageCache.put(stableKey, Boolean.TRUE); // Mark message as processed
 
             ChatMessage chatMessage = new ChatMessage(videoTitle, channelName, videoId, UUID.randomUUID().toString(), username, messageText, System.currentTimeMillis());
-            chatBroadcastService.broadcast(videoId, chatMessage); // Broadcast to subscribers
+            // chatBroadcastService.broadcast(videoId, chatMessage); // Broadcast to subscribers
             profanityLogService.logIfProfane(username, messageText); // Asynchronous profanity logging
 
             // Update keyword ranking for the processed message.

@@ -19,20 +19,31 @@ public class PlaywrightBrowserHolder implements AutoCloseable {
                 new BrowserType.LaunchOptions()
                         .setHeadless(true)
                         .setArgs(List.of(
+                                "--no-startup-window", // remove if headful
+                                "--remote-debugging-port=0",
+                                "--disable-popup-blocking",
+                                "--disable-crash-reporter",
+                                // "--disable-component-extensions-with-background-pages",
+                                "--disable-sync-preferences",
+//                                "--memory-pressure-off",
+                                // "--disable-software-rasterizer", // Forces software rendering off (lowers CPU usage) - ERROR
+                                "--disable-background-timer-throttling", // Ensures background pages aren't deprioritized
+                                "--disable-renderer-backgrounding", // Prevents rendering slowdown when pages aren't active
+
                                 "--no-sandbox",
                                 "--disable-extensions",
                                 "--disable-gpu",
                                 "--disable-dev-shm-usage",
                                 "--disable-setuid-sandbox",
-                                "--single-process",
-                                "--no-zygote",
+//                                 "--single-process",
+//                                 "--no-zygote",
                                 "--disable-accelerated-2d-canvas",
                                 "--disable-web-security",
-                                "--disable-background-networking",
+                                // "--disable-background-networking",
                                 "--disable-default-apps",
                                 "--disable-sync",
                                 "--disable-translate",
-                                "--hide-scrollbars",
+                                // "--hide-scrollbars",
                                 "--metrics-recording-only",
                                 "--mute-audio",
                                 "--no-first-run",
