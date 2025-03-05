@@ -102,9 +102,10 @@ public class KeywordRankingService {
      * @param message The chat message text.
      */
     public void updateKeywordRanking(String videoId, String message) {
-        if (message.length() < 3) {
-            return; // Skip short messages
+        if (message.codePointCount(0, message.length()) < 3) {
+            return;
         }
+
         if (isNumeric(message)) {
             return; // Skip numeric messages
         }
@@ -113,6 +114,18 @@ public class KeywordRankingService {
         // Basic tokenization (consider more robust parsing if needed)
         String[] words = message.split("\\s+");
         for (String word : words) {
+            if (word.codePointCount(0, word.length()) < 3) {
+                return;
+            }
+
+            if (word.chars().allMatch(ch ->
+                    (ch >= 'ㄱ' && ch <= 'ㅎ') || // Korean consonants
+                            (ch >= 'ㅏ' && ch <= 'ㅣ') || // Korean vowels
+                            (ch >= 'a' && ch <= 'z') ||   // English lowercase
+                            (ch >= 'A' && ch <= 'Z'))) {  // English uppercase
+                continue; // Skip words containing only these characters
+            }
+
             String keyword = word.trim().toLowerCase();
             if (keyword.isEmpty() || ignoreKeywords.contains(keyword)) {
                 continue;
