@@ -1,5 +1,6 @@
 package csw.youtube.chat.playwright;
 
+import com.sun.management.OperatingSystemMXBean;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.KeywordRankingService;
@@ -9,6 +10,7 @@ import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.stereotype.Component;
 
+import java.lang.management.ManagementFactory;
 import java.time.Instant;
 import java.util.*;
 
@@ -22,13 +24,28 @@ public class ScraperStatsEndpoint {
     private final KeywordRankingService keywordRankingService;
 
     @ReadOperation
-    public Map<String, ScraperMetrics> getScraperStats() {
-        // First, read everything into a list so we can custom-sort
-        List<Map.Entry<String, ScraperMetrics>> statsList = new ArrayList<>();
+    public Map<String, Object> getScraperStats() {
+        // Initialize system statistics
+        OperatingSystemMXBean osBean =
+                (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        double cpuUsage = osBean.getCpuLoad() * 100.0; // System load average (better for long-term trends)
+        long totalMemory = Runtime.getRuntime().totalMemory();
+        long freeMemory = Runtime.getRuntime().freeMemory();
+        long usedMemory = totalMemory - freeMemory;
+        double usedMemoryMB = usedMemory / (1024.0 * 1024.0);
 
+        // Count running scrapers
+        int runningScraperCount = 0;
+
+        // read everything into a list so we can custom-sort
+        List<Map.Entry<String, ScraperMetrics>> statsList = new ArrayList<>();
         for (Map.Entry<String, ScraperState> entry : ytChatScraperService.getScraperStates().entrySet()) {
             String videoId = entry.getKey();
             ScraperState state = entry.getValue();
+
+            if (state.getStatus().name().equals("RUNNING")) {
+                runningScraperCount++;
+            }
 
             // Retrieve top 5 keywords
             List<KeywordRankingPair> topKeywordsWithScores = keywordRankingService.getTopKeywordStrings(videoId, 5);
@@ -81,7 +98,15 @@ public class ScraperStatsEndpoint {
         for (Map.Entry<String, ScraperMetrics> entry : statsList) {
             sortedStats.put(entry.getKey(), entry.getValue());
         }
-        return sortedStats;
+
+        // Wrap everything in a root-level response
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("cpuUsage", cpuUsage);
+        response.put("memUsage", usedMemoryMB);
+        response.put("runningScraperCount", runningScraperCount);
+        response.put("scrapers", sortedStats);
+
+        return response;
     }
 
     /**

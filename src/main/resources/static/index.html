@@ -69,7 +69,7 @@
             alert("Please enter a Video ID");
             return;
         }
-        fetch("/start-scraper?videoId=" + encodeURIComponent(vid))
+        fetch("/scrapers/start-scraper?videoId=" + encodeURIComponent(vid))
             .then(r => r.text())
             .then(msg => appendMessage("StartScraper: " + msg))
             .catch(err => appendMessage("Error: " + err));
@@ -81,7 +81,7 @@
             alert("Enter a Video ID to stop");
             return;
         }
-        fetch("/stop-scraper?videoId=" + encodeURIComponent(vid))
+        fetch("/scrapers/stop-scraper?videoId=" + encodeURIComponent(vid))
             .then(r => r.text())
             .then(msg => appendMessage("StopScraper: " + msg))
             .catch(err => appendMessage("Error: " + err));

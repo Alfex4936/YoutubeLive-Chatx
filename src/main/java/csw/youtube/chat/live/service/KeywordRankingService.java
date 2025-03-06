@@ -126,7 +126,7 @@ public class KeywordRankingService {
                 continue; // Skip words containing only these characters
             }
 
-            String keyword = word.trim().toLowerCase();
+            String keyword = word.trim().toLowerCase(); // Locale.Root?
             if (keyword.isEmpty() || ignoreKeywords.contains(keyword)) {
                 continue;
             }

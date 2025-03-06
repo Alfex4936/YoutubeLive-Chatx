@@ -5,6 +5,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.options.LoadState;
+import csw.youtube.chat.live.dto.ChatMessage;
 import csw.youtube.chat.live.js.YouTubeChatScriptProvider;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.playwright.PlaywrightBrowserManager;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -151,7 +153,7 @@ public class YTChatScraperService {
      */
     private ScraperState initializeScraperState(String videoId) {
         ScraperState state = new ScraperState(videoId);
-        state.setStatus(ScraperState.Status.RUNNING);
+        state.setStatus(ScraperState.Status.IDLE);
         scraperStates.put(videoId, state);
 
         String threadName = Thread.currentThread().getName();
@@ -186,9 +188,11 @@ public class YTChatScraperService {
             Page iframePage = chatBodyLocator.page(); // The iframe's page
             waitForInitialMessages(chatMessagesLocator);
 
+            state.setStatus(ScraperState.Status.RUNNING);
+
             // 4) Inject JavaScript and track messages
             AtomicInteger messagesPerInterval = new AtomicInteger(0);
-            setupChatScripts(iframePage, chatBodyLocator, messagesPerInterval, videoId);
+            setupChatScripts(iframePage, chatBodyLocator, messagesPerInterval, videoId, videoTitle, channelName);
 
             // 5) Periodically log throughput while the scraper is running
             try (ScheduledExecutorService scheduler =
@@ -260,7 +264,8 @@ public class YTChatScraperService {
      * Injects the JavaScript scripts/observers and sets up the exposed Java function
      * for handling new chat messages.
      */
-    private void setupChatScripts(Page iframePage, Locator chatBodyLocator, AtomicInteger messagesPerInterval, String videoId) {
+    private void setupChatScripts(Page iframePage, Locator chatBodyLocator, AtomicInteger messagesPerInterval,
+                                  String videoId, String videoTitle, String channelName) {
         // Expose the chat handler object
         iframePage.evaluate(YouTubeChatScriptProvider.getExposeHandlerScript());
 
@@ -279,11 +284,14 @@ public class YTChatScraperService {
                 currentState.getTotalMessages().incrementAndGet();
             }
 
+            ChatMessage chatMessage = new ChatMessage(videoTitle, channelName, videoId, UUID.randomUUID().toString(), username, messageText, System.currentTimeMillis());
+            chatBroadcastService.broadcast(videoId, chatMessage);
+
             // Profanity / keyword logic
             profanityLogService.logIfProfane(username, messageText);
 
-            // TODO ASYNC
-            keywordRankingService.updateKeywordRanking(videoId, messageText);
+            // Offload the keyword ranking update asynchronously using the executor.
+            chatScraperExecutor.execute(() -> keywordRankingService.updateKeywordRanking(videoId, messageText));
 
             return null;
         });
@@ -372,6 +380,10 @@ public class YTChatScraperService {
         scraperFuture.completeExceptionally(ex);
         state.setStatus(ScraperState.Status.FAILED);
         state.setErrorMessage("Outer error: " + ex.getMessage());
+    }
+
+    public ScraperState getScraperState(String videoId) {
+        return scraperStates.get(videoId);
     }
 
     // ------------------------------------------------------------------------
