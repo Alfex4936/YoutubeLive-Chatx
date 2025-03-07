@@ -142,6 +142,7 @@ public class KeywordRankingService {
             return; // Skip
         }
 
+        // NOTE do I want to skip by words or guess from entire message
         Language detected = globalLanguageDetector.detectLanguageOf(message);
         // If in skip-langs, skip,  detected == Language.UNKNOWN ||
         if (skipLangs.contains(detected)) {

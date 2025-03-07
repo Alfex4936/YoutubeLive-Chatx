@@ -121,6 +121,7 @@
         <tr>
             <th>Video ID</th>
             <th>Status</th>
+            <th>Skipped Langs</th>
             <th>Thread</th>
             <th>Error</th>
             <th>Actions</th>
@@ -139,6 +140,15 @@
                       th:text="${entry.value.status}">
                 Status</span>
             </td>
+            <td>
+                <!-- Check if skipLangs is not empty -->
+                <span th:if="${entry.value.skipLangs != null and !entry.value.skipLangs.isEmpty()}">
+                    <span th:each="lang,iterStat : ${entry.value.skipLangs}">
+                      <span th:text="${lang}"></span><span th:text="${iterStat.last ? '' : ', '}"></span>
+                    </span>
+                </span>
+                <span th:unless="${entry.value.skipLangs != null and !entry.value.skipLangs.isEmpty()}">-</span>
+            </td>
             <td th:text="${entry.value.threadName}">Thread Name</td>
             <td>
                 <!-- Show error ONLY if status == FAILED -->
@@ -156,7 +166,8 @@
             <td>
                 <!-- Show "Stop" only if RUNNING -->
                 <!--/*@thymesVar id="ScraperState"*/-->
-                <a th:if="${entry.value.status.name()} == 'RUNNING'" th:href="@{/scrapers/stop-scraper(videoId=${entry.key})}"
+                <a th:if="${entry.value.status.name()} == 'RUNNING'"
+                   th:href="@{/scrapers/stop-scraper(videoId=${entry.key})}"
                    class="btn-link">Stop</a>
             </td>
         </tr>
@@ -192,7 +203,8 @@
             <label><input type="checkbox" name="langs" value="ALBANIAN"/> Albanian</label>
             <label><input type="checkbox" name="langs" value="AZERBAIJANI"/> Azerbaijani</label>
             <label><input type="checkbox" name="langs" value="URDU"/> Urdu</label>
-        </div><br/>
+        </div>
+        <br/>
 
         <button type="submit">Start Scraper</button>
     </form>
