@@ -12,6 +12,7 @@ import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.stereotype.Component;
 
 import java.lang.management.ManagementFactory;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -51,11 +52,15 @@ public class ScraperStatsEndpoint {
             // Retrieve top 5 keywords
             List<KeywordRankingPair> topKeywordsWithScores = keywordRankingService.getTopKeywordStrings(videoId, 5);
 
+            Instant createdAt = state.getCreatedAt();
+            long runningTimeMinutes = Duration.between(createdAt, Instant.now()).toMinutes();
+
             ScraperMetrics metrics = new ScraperMetrics(
                     state.getVideoTitle(),
                     state.getChannelName(),
                     state.getVideoUrl(),
                     state.getStatus(),
+                    runningTimeMinutes,
                     state.getSkipLangs(),
                     state.getLastThroughput(),
                     state.getMaxThroughput(),
@@ -119,6 +124,7 @@ public class ScraperStatsEndpoint {
             String channelName,
             String videoUrl,
             ScraperState.Status status,
+            long runningTimeMinutes, // minutes
             Set<Language> skipLangs,
             int lastThroughput,
             int maxThroughput,
