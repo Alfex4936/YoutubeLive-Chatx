@@ -1,6 +1,8 @@
 package csw.youtube.chat.live.service;
 
 
+import com.github.pemistahl.lingua.api.Language;
+import com.github.pemistahl.lingua.api.LanguageDetector;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -8,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -34,9 +35,44 @@ public class KeywordRankingService {
 
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final LanguageDetector globalLanguageDetector;
 
     // Define a set of keywords to ignore
     private final Set<String> ignoreKeywords = new HashSet<>();
+
+    public static boolean isNumeric(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+
+        int len = str.length();
+        int i = 0;
+        boolean hasDecimal = false;
+
+        if (str.charAt(i) == '-') {
+            i++; // Skip negative sign
+            if (i >= len) return false; // "-" alone is not valid
+        }
+
+        while (i < len) {
+            char c = str.charAt(i);
+            if (Character.isDigit(c)) {
+                // It's a number
+            } else if (c == '.' && !hasDecimal) {
+                hasDecimal = true; // Allow one decimal point
+                if (i + 1 >= len) return false; // "." must be followed by a digit
+            } else {
+                return false; // Invalid character
+            }
+            i++;
+        }
+
+        return true;
+    }
+
+    public static boolean isSymbolOnly(String str) {
+        return str.chars().noneMatch(Character::isLetterOrDigit);
+    }
 
     /**
      * Loads ignorable keywords from a file and adds extra English and Korean stop words.
@@ -59,7 +95,7 @@ public class KeywordRankingService {
 
         // English stop words.
         ignoreKeywords.addAll(List.of(
-                "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z",
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
                 "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
                 "me", "my", "myself", "we", "our", "ours", "ourselves", "se",
                 "you", "your", "yours", "yourself", "yourselves",
@@ -101,30 +137,40 @@ public class KeywordRankingService {
      * @param videoId The video identifier.
      * @param message The chat message text.
      */
-    public void updateKeywordRanking(String videoId, String message) {
-        if (message.codePointCount(0, message.length()) < 3) {
-            return;
+    public void updateKeywordRanking(String videoId, String message, Set<Language> skipLangs) {
+        if (message == null || message.codePointCount(0, message.length()) < 3) {
+            return; // Skip
         }
 
-        if (isNumeric(message)) {
-            return; // Skip numeric messages
+        Language detected = globalLanguageDetector.detectLanguageOf(message);
+        // If in skip-langs, skip,  detected == Language.UNKNOWN ||
+        if (skipLangs.contains(detected)) {
+            // log.debug("Lang {}", detected);
+            return;
         }
 
         String key = "video:" + videoId + ":keywords";
         // Basic tokenization (consider more robust parsing if needed)
         String[] words = message.split("\\s+");
         for (String word : words) {
-            if (word.codePointCount(0, word.length()) < 3) {
-                return;
+            if (word.codePointCount(0, word.length()) < 3 || isNumeric(word)) {
+                continue;
+            }
+
+            if (isSymbolOnly(word)) {
+                continue; // Skip if the word is entirely symbols
+            }
+
+            if (word.chars().distinct().count() == 1) {
+                continue; // Skip words that are made of a single repeated character
             }
 
             if (word.chars().allMatch(ch ->
-                    (ch >= 'ㄱ' && ch <= 'ㅎ') || // Korean consonants
-                            (ch >= 'ㅏ' && ch <= 'ㅣ') || // Korean vowels
-                            (ch >= 'a' && ch <= 'z') ||   // English lowercase
-                            (ch >= 'A' && ch <= 'Z'))) {  // English uppercase
+                    // (ch >= 'ㄱ' && ch <= 'ㅎ') || // Korean consonants
+                            (ch >= 'ㅏ' && ch <= 'ㅣ'))) { // Korean vowels
                 continue; // Skip words containing only these characters
             }
+
 
             String keyword = word.trim().toLowerCase(); // Locale.Root?
             if (keyword.isEmpty() || ignoreKeywords.contains(keyword)) {
@@ -167,37 +213,5 @@ public class KeywordRankingService {
         return typedTuples.stream()
                 .map(tuple -> new KeywordRankingPair(tuple.getValue(), tuple.getScore())) // Extract keyword + score
                 .collect(Collectors.toList());
-    }
-
-    public static boolean isNumeric(String str) {
-        if (str == null || str.isEmpty()) {
-            return false;
-        }
-
-        int len = str.length();
-        int i = 0;
-        boolean hasDecimal = false;
-
-        // Handle negative sign
-        if (str.charAt(i) == '-') {
-            i++; // Skip the negative sign
-            if (i >= len) return false; // "-" alone is not valid
-        }
-
-        // Check remaining characters
-        while (i < len) {
-            char c = str.charAt(i);
-            if (c >= '0' && c <= '9') {
-                // Digit is fine
-            } else if (c == '.' && !hasDecimal) {
-                hasDecimal = true; // Allow one decimal point
-                if (i + 1 >= len) return false; // "." must be followed by a digit
-            } else {
-                return false; // Invalid character
-            }
-            i++;
-        }
-
-        return true;
     }
 }

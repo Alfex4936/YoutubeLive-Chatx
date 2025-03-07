@@ -3,7 +3,6 @@ package csw.youtube.chat.playwright;
 import com.microsoft.playwright.*;
 import lombok.extern.slf4j.Slf4j;
 
-import java.nio.file.Paths;
 import java.util.List;
 
 @Slf4j
@@ -53,7 +52,7 @@ public class PlaywrightBrowserHolder implements AutoCloseable {
                         .setTimeout(30000)
                         .setIgnoreDefaultArgs(List.of("--enable-automation"))
                         .setSlowMo(0)
-                        // .setDownloadsPath(Paths.get("/tmp/downloads"))
+                // .setDownloadsPath(Paths.get("/tmp/downloads"))
         );
         log.info("Created new PlaywrightBrowserHolder instance");
     }

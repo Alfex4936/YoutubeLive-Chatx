@@ -1,5 +1,6 @@
 package csw.youtube.chat.live.service;
 
+import com.github.pemistahl.lingua.api.Language;
 import com.microsoft.playwright.FrameLocator;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
@@ -9,6 +10,7 @@ import csw.youtube.chat.live.dto.ChatMessage;
 import csw.youtube.chat.live.js.YouTubeChatScriptProvider;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.playwright.PlaywrightBrowserManager;
+import csw.youtube.chat.playwright.pool.PlaywrightPoolManager;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,7 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * TODO Auto-clean COMPLETED/FAILED scrapers (scheduling)
  */
 @Slf4j
-@RequiredArgsConstructor
+// @RequiredArgsConstructor
 @Service
 public class YTChatScraperService {
 
@@ -57,10 +60,26 @@ public class YTChatScraperService {
     /**
      * Executor for running chat scraping tasks asynchronously (uses virtual threads).
      */
-    @Qualifier("chatScraperExecutor")
+    // @Qualifier("chatScraperExecutor")
     private final Executor chatScraperExecutor;
 
     private final PlaywrightBrowserManager playwrightBrowserManager;
+
+    private final PlaywrightPoolManager playwrightPoolManager;
+
+    public YTChatScraperService(ChatBroadcastService chatBroadcastService,
+                                ProfanityLogService profanityLogService,
+                                KeywordRankingService keywordRankingService,
+                                @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
+                                PlaywrightBrowserManager playwrightBrowserManager,
+                                PlaywrightPoolManager playwrightPoolManager) {
+        this.chatBroadcastService = chatBroadcastService;
+        this.profanityLogService = profanityLogService;
+        this.keywordRankingService = keywordRankingService;
+        this.chatScraperExecutor = chatScraperExecutor;
+        this.playwrightBrowserManager = playwrightBrowserManager;
+        this.playwrightPoolManager = playwrightPoolManager;
+    }
 
     @PreDestroy
     public void onDestroy() {
@@ -80,7 +99,7 @@ public class YTChatScraperService {
      * @throws IllegalArgumentException if the videoId is null or empty.
      */
     @Async("chatScraperExecutor")
-    public CompletableFuture<Void> scrapeChannel(String videoId) {
+    public CompletableFuture<Void> scrapeChannel(String videoId, Set<Language> skipLangs) {
         validateVideoId(videoId);
 
         // Avoid starting duplicate scrapers
@@ -93,12 +112,13 @@ public class YTChatScraperService {
         ScraperState state = initializeScraperState(videoId);
         CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
         activeFutures.put(videoId, scraperFuture);
+        state.setSkipLangs(skipLangs);
 
         // Launch the scraping logic in a separate task
         chatScraperExecutor.execute(() -> {
             try {
                 playwrightBrowserManager.withPage(page -> {
-                    scrapeChat(page, videoId, state, scraperFuture);
+                    scrapeChat(page, videoId, state, scraperFuture, skipLangs);
                 });
             } catch (Exception outerEx) {
                 handleOuterException(videoId, outerEx, scraperFuture, state);
@@ -107,6 +127,38 @@ public class YTChatScraperService {
             }
         });
 
+        return scraperFuture;
+    }
+
+    @Async("scraperExecutor")
+    public CompletableFuture<Void> scrapeChannelWithPool(String videoId, Set<Language> skipLangs) {
+        // Validate the video ID
+        validateVideoId(videoId);
+
+        // Check for existing scrapers to avoid duplicates
+        if (activeFutures.containsKey(videoId)) {
+            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        // Initialize scraper state and future
+        ScraperState state = initializeScraperState(videoId);
+        CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
+        activeFutures.put(videoId, scraperFuture);
+
+        // Execute scraping with a pooled browser page
+        try {
+            playwrightPoolManager.withPage(page -> {
+                scrapeChat(page, videoId, state, scraperFuture, skipLangs);
+                return null;
+            });
+        } catch (Exception ex) {
+            handleOuterException(videoId, ex, scraperFuture, state);
+        } finally {
+            cleanupScraper(videoId); // Ensure cleanup (e.g., remove from activeFutures)
+        }
+
+        // Return the future immediately for the caller to track completion
         return scraperFuture;
     }
 
@@ -169,7 +221,7 @@ public class YTChatScraperService {
      * Encapsulates the main scraping logic: navigating the page, injecting JS, observing messages,
      * and tracking throughput until the scraperFuture is signaled to complete.
      */
-    private void scrapeChat(Page page, String videoId, ScraperState state, CompletableFuture<Void> scraperFuture) {
+    private void scrapeChat(Page page, String videoId, ScraperState state, CompletableFuture<Void> scraperFuture, Set<Language> skipLangs) {
         try {
             // 1) Navigate and wait for DOM
             navigateToVideo(page, videoId);
@@ -192,7 +244,7 @@ public class YTChatScraperService {
 
             // 4) Inject JavaScript and track messages
             AtomicInteger messagesPerInterval = new AtomicInteger(0);
-            setupChatScripts(iframePage, chatBodyLocator, messagesPerInterval, videoId, videoTitle, channelName);
+            setupChatScripts(iframePage, chatBodyLocator, messagesPerInterval, videoId, videoTitle, channelName, skipLangs);
 
             // 5) Periodically log throughput while the scraper is running
             try (ScheduledExecutorService scheduler =
@@ -265,7 +317,7 @@ public class YTChatScraperService {
      * for handling new chat messages.
      */
     private void setupChatScripts(Page iframePage, Locator chatBodyLocator, AtomicInteger messagesPerInterval,
-                                  String videoId, String videoTitle, String channelName) {
+                                  String videoId, String videoTitle, String channelName, Set<Language> skipLangs) {
         // Expose the chat handler object
         iframePage.evaluate(YouTubeChatScriptProvider.getExposeHandlerScript());
 
@@ -291,7 +343,7 @@ public class YTChatScraperService {
             profanityLogService.logIfProfane(username, messageText);
 
             // Offload the keyword ranking update asynchronously using the executor.
-            chatScraperExecutor.execute(() -> keywordRankingService.updateKeywordRanking(videoId, messageText));
+            chatScraperExecutor.execute(() -> keywordRankingService.updateKeywordRanking(videoId, messageText, skipLangs));
 
             return null;
         });

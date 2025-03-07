@@ -1,8 +1,7 @@
 package csw.youtube.chat.live.controller;
 
-import csw.youtube.chat.live.dto.ChatMessage;
+import com.github.pemistahl.lingua.api.Language;
 import csw.youtube.chat.live.model.ScraperState;
-import csw.youtube.chat.live.service.ChatMessageService;
 import csw.youtube.chat.live.service.KeywordRankingService;
 import csw.youtube.chat.live.service.YTChatScraperService;
 import lombok.RequiredArgsConstructor;
@@ -17,46 +16,36 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Set;
+
+import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/scrapers")
 public class ScraperController {
 
-    private final ChatMessageService chatMessageService;
     private final YTChatScraperService scraperService;
     private final KeywordRankingService keywordRankingService;
 
-    /**
-     * Returns chat messages for a channel that have a timestamp within the last `n` minutes.
-     * <p>
-     * Example: GET /channel/CHANNEL_ID/messages?n=5
-     */
-    @GetMapping("/channel/{channelId}/messages")
-    public List<ChatMessage> getMessages(
-            @PathVariable String channelId,
-            @RequestParam(defaultValue = "5") long n) {
-
-        // Retrieve all messages from the bounded store
-        List<ChatMessage> allMessages = chatMessageService.getStore(channelId).getMessages();
-        long cutoff = System.currentTimeMillis() - (n * 60 * 1000);
-
-        // Filter messages that are newer than the cutoff time
-        return allMessages.stream()
-                .filter(msg -> msg.timestamp() >= cutoff)
-                .collect(Collectors.toList());
-    }
-
     @PostMapping("/{videoId}/start")
-    public ResponseEntity<Map<String, String>> startScraper(@PathVariable String videoId) {
+    public ResponseEntity<Map<String, String>> startScraper(
+            @PathVariable String videoId,
+            @RequestParam(required = false) List<String> langs // e.g. ["ENGLISH","SPANISH","FRENCH"]
+    ) {
+        // Keep max 5
+        if (langs != null && langs.size() > 5) {
+            langs = langs.subList(0, 5);
+        }
+        // Convert to a skip-set of Language
+        Set<Language> skipLangs = parseLanguages(langs);
         ScraperState state = scraperService.getScraperState(videoId);
         if (state != null && state.getStatus() == ScraperState.Status.RUNNING) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message", "Scraper already running", "status", "RUNNING"));
         }
 
-        scraperService.scrapeChannel(videoId);
+        scraperService.scrapeChannel(videoId, skipLangs);
         return ResponseEntity.ok(Map.of("message", "Scraper started", "status", "STARTED"));
     }
 
@@ -93,12 +82,22 @@ public class ScraperController {
      * Example: GET /start-scraper?videoId=abcd1234
      */
     @GetMapping("/start-scraper")
-    public ResponseEntity<Void> startScraper2(@RequestParam String videoId) {
+    public ResponseEntity<Void> startScraper2(
+            @RequestParam String videoId,
+            @RequestParam(required = false) List<String> langs // e.g. ["ENGLISH","SPANISH","FRENCH"]
+    ) {
+        // Keep max 5
+        if (langs != null && langs.size() > 5) {
+            langs = langs.subList(0, 5);
+        }
+        // Convert to a skip-set of Language
+        Set<Language> skipLangs = parseLanguages(langs);
+
         if (videoId.startsWith("http")) {
             videoId = videoId.replace(YTChatScraperService.YOUTUBE_WATCH_URL, "");
         }
 
-        scraperService.scrapeChannel(videoId);
+        scraperService.scrapeChannel(videoId, skipLangs);
         String encodedMsg = URLEncoder.encode("Scraper started for video " + videoId, StandardCharsets.UTF_8);
 
         HttpHeaders headers = new HttpHeaders();

@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 @Controller  // ✅ This makes it return an HTML page instead of JSON
 @RequiredArgsConstructor

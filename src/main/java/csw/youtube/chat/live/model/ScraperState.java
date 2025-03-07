@@ -1,10 +1,12 @@
 package csw.youtube.chat.live.model;
 
+import com.github.pemistahl.lingua.api.Language;
 import csw.youtube.chat.live.service.YTChatScraperService;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Data
@@ -29,6 +31,8 @@ public class ScraperState {
     // If a video gets 1000 messages per second
     // 86.4 million messages per day that will take 292k years to overflow.
     private AtomicLong intervalsCount = new AtomicLong(0);
+
+    private Set<Language> skipLangs;
 
     public ScraperState(String videoId) {
         this.videoId = videoId;

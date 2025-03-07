@@ -1,81 +1,100 @@
 package csw.youtube.chat.playwright;
 
+
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.LoadState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.concurrent.*;
-import com.sun.management.OperatingSystemMXBean;
 import java.lang.management.ManagementFactory;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
-@SpringBootTest
-class PlaywrightManagerStressTest {
+@SpringBootTest(classes = {PlaywrightBrowserManager.class})
+public class PlaywrightManagerStressTest {
+
     @Autowired
     private PlaywrightBrowserManager browserManager;
 
+    // Counter to track currently alive (active) pages.
+    private final AtomicInteger livingPages = new AtomicInteger(0);
+
     @Test
-    void stressTestBrowserIsolation() throws InterruptedException {
+    void persistentPagesStressTest() throws InterruptedException {
         int concurrentTests = 5;
         boolean systemOverloaded = false;
+        // Using a cached thread pool so that new tasks can be submitted without bounds.
+        ExecutorService executor = Executors.newCachedThreadPool();
 
-        // We keep increasing concurrency until we detect "overload."
+        // Run the load test until system memory crosses 80% of max available memory.
         while (!systemOverloaded) {
-            System.out.println("\nRunning " + concurrentTests + " stress-test tasks concurrently.");
-
-            ExecutorService executor = Executors.newFixedThreadPool(concurrentTests);
-            CountDownLatch latch = new CountDownLatch(concurrentTests);
-
+            System.out.println("\nLaunching " + concurrentTests + " new tasks.");
             for (int i = 0; i < concurrentTests; i++) {
                 executor.submit(() -> {
+                    // Increase the counter for a new persistent page.
+                    livingPages.incrementAndGet();
                     try {
-                        // This calls manager.withPage(...) which ensures
-                        // each thread uses its own BrowserHolder.
                         browserManager.withPage(page -> {
-                            System.out.println("▶ Thread " + Thread.currentThread().getName() + ": Navigating...");
+                            // Navigate and wait for the page to load.
                             page.navigate("https://www.youtube.com/watch?v=jfKfPfyJRdk",
-                                    new Page.NavigateOptions().setTimeout(20000)); // 20s timeout
+                                    new Page.NavigateOptions().setTimeout(20000));
                             page.waitForLoadState(LoadState.LOAD,
                                     new Page.WaitForLoadStateOptions().setTimeout(15000));
-                            // Potentially do more stuff here...
+
+                            // Hold the page alive for 10 minutes.
+                            System.out.println("Holding page open in thread: " + Thread.currentThread().getName());
+                            try {
+                                Thread.sleep(TimeUnit.MINUTES.toMillis(10));
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
                         });
                     } catch (Exception e) {
-                        System.err.println("🚨 Playwright Error in thread " +
-                                Thread.currentThread().getName() + ": " + e);
+                        System.err.println("Error in thread " + Thread.currentThread().getName() + ": " + e);
                     } finally {
-                        latch.countDown();
+                        // When the task ends (after sleep), decrement the counter.
+                        livingPages.decrementAndGet();
                     }
                 });
             }
 
-            // Wait for all tasks to finish (or time out).
-            latch.await(30, TimeUnit.SECONDS);
-            executor.shutdown();
+            // Wait a short period to let tasks start and settle.
+            Thread.sleep(30_000);
 
-            // Check system CPU & memory usage:
-            long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-            double usedMemoryMB = usedMemory / (1024.0 * 1024.0);
-            double maxMemoryMB = Runtime.getRuntime().maxMemory() / (1024.0 * 1024.0);
+            // Gather system metrics.
+            double systemCpuLoad = getSystemCpuLoad() * 100.0;
+            double usedMemoryMB = getUsedMemoryMB();
+            double maxMemoryMB = getMaxMemoryMB();
 
-            double systemCpuLoad = getSystemCpuLoad() * 100.0;  // convert to %
-            System.out.printf("🖥  Used Memory: %.2f MB / %.2f MB  |  CPU Load: %.2f%%%n",
-                    usedMemoryMB, maxMemoryMB, systemCpuLoad);
+            // Log current load and system metrics.
+            System.out.printf("Living Pages: %d | New Tasks Launched: %d | CPU=%.2f%% | Mem=%.2fMB/%.2fMB%n",
+                    livingPages.get(), concurrentTests, systemCpuLoad, usedMemoryMB, maxMemoryMB);
 
-            // Decide if "overloaded" (arbitrary thresholds).
-            if (systemCpuLoad > 90.0 || usedMemoryMB > (maxMemoryMB * 0.8)) {
+            // Increase load if memory usage is below threshold.
+            if (usedMemoryMB > (maxMemoryMB * 0.8)) {
                 systemOverloaded = true;
             } else {
-                concurrentTests += 5;  // Increase concurrency step
+                concurrentTests += 5;  // Increase load by launching additional tasks.
             }
         }
 
-        System.out.println("🚨 System reached overload limit at " + concurrentTests + " concurrent tasks.");
+        System.out.println("🚨 System reached overload limit. Shutting down executor.");
+        executor.shutdownNow();
     }
 
     private double getSystemCpuLoad() {
-        OperatingSystemMXBean osBean =
-                (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-        return osBean.getCpuLoad(); // returns a value from 0.0 to 1.0
+        com.sun.management.OperatingSystemMXBean osBean =
+                (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        return osBean.getCpuLoad(); // returns value between 0.0 and 1.0
+    }
+
+    private double getUsedMemoryMB() {
+        long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        return usedMemory / (1024.0 * 1024.0);
+    }
+
+    private double getMaxMemoryMB() {
+        return Runtime.getRuntime().maxMemory() / (1024.0 * 1024.0);
     }
 }

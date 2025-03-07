@@ -53,6 +53,7 @@ dependencies {
 	implementation("com.microsoft.playwright", "playwright", "1.50.0")
 	implementation("com.google.guava:guava:33.4.0-jre")
 	implementation("org.apache.commons:commons-pool2:2.12.1")
+	implementation("com.github.pemistahl:lingua:1.2.2")
 
 	runtimeOnly("org.postgresql:postgresql")
 	compileOnly("org.projectlombok:lombok")

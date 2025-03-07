@@ -1,5 +1,6 @@
 package csw.youtube.chat.playwright;
 
+import com.github.pemistahl.lingua.api.Language;
 import com.sun.management.OperatingSystemMXBean;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.model.ScraperState;
@@ -55,6 +56,7 @@ public class ScraperStatsEndpoint {
                     state.getChannelName(),
                     state.getVideoUrl(),
                     state.getStatus(),
+                    state.getSkipLangs(),
                     state.getLastThroughput(),
                     state.getMaxThroughput(),
                     state.getAverageThroughput(),
@@ -117,6 +119,7 @@ public class ScraperStatsEndpoint {
             String channelName,
             String videoUrl,
             ScraperState.Status status,
+            Set<Language> skipLangs,
             int lastThroughput,
             int maxThroughput,
             double averageThroughput,

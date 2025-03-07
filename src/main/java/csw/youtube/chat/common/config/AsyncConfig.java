@@ -9,6 +9,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
 @EnableAsync
@@ -34,6 +35,18 @@ public class AsyncConfig {
         executor.setQueueCapacity(500);   // waiting tasks
         executor.setAllowCoreThreadTimeOut(true); // let the pool shrink back down if those core threads stay idle for too long.
         executor.setThreadNamePrefix("yt-scraper-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean(name = "scraperExecutor")
+    public Executor scraperExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(30); // 30 threads, so 30 browsers
+        executor.setMaxPoolSize(30); // Cap at 30 to limit resource usage
+        executor.setQueueCapacity(100); // Queue up to 100 tasks when all threads are busy
+        executor.setThreadNamePrefix("scraper-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy()); // Run in caller’s thread if queue is full
         executor.initialize();
         return executor;
     }

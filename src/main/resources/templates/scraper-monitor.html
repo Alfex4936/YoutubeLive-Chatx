@@ -82,6 +82,28 @@
             color: red;
             font-style: italic;
         }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            max-width: 600px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 5px;
+        }
+
     </style>
 </head>
 <body>
@@ -146,8 +168,50 @@
     <form th:action="@{/scrapers/start-scraper}" method="get">
         <label for="videoId">Video ID or URL:</label>
         <input type="text" id="videoId" name="videoId" placeholder="jfKfPfyJRdk" value="jfKfPfyJRdk"/>
+
+        <br/><br/>
+
+        <p>Select Languages to Skip (max 5):</p>
+        <div class="checkbox-group">
+            <label><input type="checkbox" name="langs" value="ENGLISH"/> English</label>
+            <label><input type="checkbox" name="langs" value="SPANISH"/> Spanish</label>
+            <label><input type="checkbox" name="langs" value="FRENCH"/> French</label>
+            <label><input type="checkbox" name="langs" value="GERMAN"/> German</label>
+            <label><input type="checkbox" name="langs" value="KOREAN"/> Korean</label>
+            <label><input type="checkbox" name="langs" value="ARABIC"/> Arabic</label>
+            <label><input type="checkbox" name="langs" value="NYNORSK"/> Nynorsk</label>
+            <label><input type="checkbox" name="langs" value="DANISH"/> Danish</label>
+            <label><input type="checkbox" name="langs" value="MAORI"/> Maori</label>
+            <label><input type="checkbox" name="langs" value="DUTCH"/> Dutch</label>
+            <label><input type="checkbox" name="langs" value="PERSIAN"/> Persian</label>
+            <label><input type="checkbox" name="langs" value="ESTONIAN"/> Estonian</label>
+            <label><input type="checkbox" name="langs" value="POLISH"/> Polish</label>
+            <label><input type="checkbox" name="langs" value="TAGALOG"/> Tagalog</label>
+            <label><input type="checkbox" name="langs" value="SWEDISH"/> Swedish</label>
+            <label><input type="checkbox" name="langs" value="SOMALI"/> Somali</label>
+            <label><input type="checkbox" name="langs" value="ALBANIAN"/> Albanian</label>
+            <label><input type="checkbox" name="langs" value="AZERBAIJANI"/> Azerbaijani</label>
+            <label><input type="checkbox" name="langs" value="URDU"/> Urdu</label>
+        </div><br/>
+
         <button type="submit">Start Scraper</button>
     </form>
 </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const checkboxes = document.querySelectorAll("input[name='langs']");
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener("change", function () {
+                let checkedCount = document.querySelectorAll("input[name='langs']:checked").length;
+
+                if (checkedCount > 5) {
+                    this.checked = false; // Prevent checking more than 5
+                    alert("You can select up to 5 languages only.");
+                }
+            });
+        });
+    });
+</script>
 </body>
 </html>
