@@ -157,4 +157,16 @@ public class YouTubeChatScriptProvider {
                 }
                 """;
     }
+
+    public static String getDisconnectObserverScript() {
+        return """
+        () => {
+            if (window._chatObserver) {
+                window._chatObserver.disconnect();
+                window._chatObserver = null;
+            }
+        }
+    """;
+    }
+
 }

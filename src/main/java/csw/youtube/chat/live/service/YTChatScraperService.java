@@ -6,26 +6,29 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.options.LoadState;
-import csw.youtube.chat.live.dto.ChatMessage;
+import csw.youtube.chat.live.dto.SimpleChatMessage;
 import csw.youtube.chat.live.js.YouTubeChatScriptProvider;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.playwright.PlaywrightBrowserManager;
-import csw.youtube.chat.playwright.pool.PlaywrightPoolManager;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static csw.youtube.chat.live.js.YouTubeChatScriptProvider.getMutationObserverScript;
 
 /**
  * Service for scraping YouTube Live Chat messages for a given video ID.
@@ -41,6 +44,8 @@ public class YTChatScraperService {
     public static final String YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v=";
     private static final int POLL_INTERVAL_MS = 1000;
     private static final int PLAYWRIGHT_TIMEOUT_MS = 10000; // For selectors and navigation
+    // private final Semaphore semaphore = new Semaphore(50); // Max concurrent requests
+    private static final Duration FAILED_SCRAPER_CLEANUP_THRESHOLD = Duration.ofMinutes(5);
 
     @Getter
     // Keep track of active scrapers: videoId -> future
@@ -53,7 +58,7 @@ public class YTChatScraperService {
     // Map of videoId -> threadName (or some stable ID) for display
     private final Map<String, String> videoThreadNames = new ConcurrentHashMap<>();
 
-    private final ChatBroadcastService chatBroadcastService;
+    // private final ChatBroadcastService chatBroadcastService;
     private final ProfanityLogService profanityLogService;
     private final KeywordRankingService keywordRankingService;
 
@@ -65,20 +70,25 @@ public class YTChatScraperService {
 
     private final PlaywrightBrowserManager playwrightBrowserManager;
 
-    private final PlaywrightPoolManager playwrightPoolManager;
+    /* POOL TEST */
+    // private final PlaywrightPoolManager playwrightPoolManager;
+    // private final PlaywrightWorkerPool playwrightWorkerPool;
 
-    public YTChatScraperService(ChatBroadcastService chatBroadcastService,
-                                ProfanityLogService profanityLogService,
-                                KeywordRankingService keywordRankingService,
-                                @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
-                                PlaywrightBrowserManager playwrightBrowserManager,
-                                PlaywrightPoolManager playwrightPoolManager) {
-        this.chatBroadcastService = chatBroadcastService;
+    public YTChatScraperService(
+            //ChatBroadcastService chatBroadcastService,
+            ProfanityLogService profanityLogService,
+            KeywordRankingService keywordRankingService,
+            @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
+            PlaywrightBrowserManager playwrightBrowserManager
+            //PlaywrightPoolManager playwrightPoolManager, PlaywrightWorkerPool playwrightWorkerPool
+    ) {
+        //this.chatBroadcastService = chatBroadcastService;
         this.profanityLogService = profanityLogService;
         this.keywordRankingService = keywordRankingService;
         this.chatScraperExecutor = chatScraperExecutor;
         this.playwrightBrowserManager = playwrightBrowserManager;
-        this.playwrightPoolManager = playwrightPoolManager;
+//        this.playwrightPoolManager = playwrightPoolManager;
+//        this.playwrightWorkerPool = playwrightWorkerPool;
     }
 
     @PreDestroy
@@ -118,9 +128,15 @@ public class YTChatScraperService {
         chatScraperExecutor.execute(() -> {
             try {
                 playwrightBrowserManager.withPage(page -> {
-                    scrapeChat(page, videoId, state, scraperFuture, skipLangs);
+                    try {
+                        scrapeChat(page, videoId, state, scraperFuture, skipLangs);
+                    } catch (Exception e) {
+                        log.error("Error during scraping chat for video {}", videoId, e);
+                        handleOuterException(videoId, e, scraperFuture, state);
+                    }
                 });
             } catch (Exception outerEx) {
+                log.error("Error in scrapeChannel for video {}", videoId, outerEx);
                 handleOuterException(videoId, outerEx, scraperFuture, state);
             } finally {
                 // cleanupScraper(videoId);
@@ -130,37 +146,41 @@ public class YTChatScraperService {
         return scraperFuture;
     }
 
-    @Async("scraperExecutor")
-    public CompletableFuture<Void> scrapeChannelWithPool(String videoId, Set<Language> skipLangs) {
-        // Validate the video ID
-        validateVideoId(videoId);
+//    @Async("scraperExecutor")
+//    public CompletableFuture<Void> scrapeChannelWithPool(String videoId, Set<Language> skipLangs) {
+//        // Validate the video ID
+//        validateVideoId(videoId);
+//
+//        // Check for existing scrapers to avoid duplicates
+//        if (activeFutures.containsKey(videoId)) {
+//            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
+//            return CompletableFuture.completedFuture(null);
+//        }
+//
+//        // Initialize scraper state and future
+//        ScraperState state = initializeScraperState(videoId);
+//        CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
+//        activeFutures.put(videoId, scraperFuture);
+//
+//        // Execute scraping with a pooled browser page
+//        try {
+//            playwrightPoolManager.withPage(page -> {
+//                scrapeChat(page, videoId, state, scraperFuture, skipLangs);
+//                return null;
+//            });
+//        } catch (Exception ex) {
+//            handleOuterException(videoId, ex, scraperFuture, state);
+//        } finally {
+//            cleanupScraper(videoId); // Ensure cleanup (e.g., remove from activeFutures)
+//        }
+//
+//        // Return the future immediately for the caller to track completion
+//        return scraperFuture;
+//    }
 
-        // Check for existing scrapers to avoid duplicates
-        if (activeFutures.containsKey(videoId)) {
-            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
-            return CompletableFuture.completedFuture(null);
-        }
-
-        // Initialize scraper state and future
-        ScraperState state = initializeScraperState(videoId);
-        CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
-        activeFutures.put(videoId, scraperFuture);
-
-        // Execute scraping with a pooled browser page
-        try {
-            playwrightPoolManager.withPage(page -> {
-                scrapeChat(page, videoId, state, scraperFuture, skipLangs);
-                return null;
-            });
-        } catch (Exception ex) {
-            handleOuterException(videoId, ex, scraperFuture, state);
-        } finally {
-            cleanupScraper(videoId); // Ensure cleanup (e.g., remove from activeFutures)
-        }
-
-        // Return the future immediately for the caller to track completion
-        return scraperFuture;
-    }
+    // ------------------------------------------------------------------------
+    //  Refactored Private Methods
+    // ------------------------------------------------------------------------
 
     /**
      * Stops the scraper for the given video ID if it is currently active.
@@ -186,10 +206,6 @@ public class YTChatScraperService {
         log.info("Stopping scraper requested for video ID: {}", videoId);
         return "Stopping scraper for video ID: " + videoId;
     }
-
-    // ------------------------------------------------------------------------
-    //  Refactored Private Methods
-    // ------------------------------------------------------------------------
 
     /**
      * Validates the given videoId to ensure it is not null or empty.
@@ -336,8 +352,8 @@ public class YTChatScraperService {
                 currentState.getTotalMessages().incrementAndGet();
             }
 
-            ChatMessage chatMessage = new ChatMessage(videoTitle, channelName, videoId, UUID.randomUUID().toString(), username, messageText, System.currentTimeMillis());
-            chatBroadcastService.broadcast(videoId, chatMessage);
+//            ChatMessage chatMessage = new ChatMessage(videoTitle, channelName, videoId, UUID.randomUUID().toString(), username, messageText, System.currentTimeMillis());
+//            chatBroadcastService.broadcast(videoId, chatMessage);
 
             // Profanity / keyword logic
             profanityLogService.logIfProfane(username, messageText);
@@ -349,7 +365,24 @@ public class YTChatScraperService {
         });
 
         // Set up the MutationObserver to watch for new chat messages
-        chatBodyLocator.evaluate(YouTubeChatScriptProvider.getMutationObserverScript());
+        chatBodyLocator.evaluate(getMutationObserverScript());
+    }
+
+    public void processChatMessages(String videoId, List<SimpleChatMessage> messages) {
+        Set<Language> skipLangs = getScraperStates()
+                .getOrDefault(videoId, new ScraperState(videoId))
+                .getSkipLangs();
+
+        for (SimpleChatMessage chatMessage : messages) {
+            String username = chatMessage.username();
+            String message = chatMessage.message();
+
+            // Profanity / keyword logic
+            profanityLogService.logIfProfane(username, message);
+
+            // Offload the keyword ranking update asynchronously using the executor.
+            chatScraperExecutor.execute(() -> keywordRankingService.updateKeywordRanking(videoId, message, skipLangs));
+        }
     }
 
     /**
@@ -373,7 +406,7 @@ public class YTChatScraperService {
      */
     private void logThroughput(AtomicInteger messagesPerInterval, String videoId) {
         int count = messagesPerInterval.getAndSet(0);
-        log.info("📊 Throughput: {} messages in last 10s for video {}", count, videoId);
+        // log.info("📊 Throughput: {} messages in last 10s for video {}", count, videoId);
 
         ScraperState state = scraperStates.get(videoId);
         if (state != null) {
@@ -434,13 +467,13 @@ public class YTChatScraperService {
         state.setErrorMessage("Outer error: " + ex.getMessage());
     }
 
-    public ScraperState getScraperState(String videoId) {
-        return scraperStates.get(videoId);
-    }
-
     // ------------------------------------------------------------------------
     // Helper Methods
     // ------------------------------------------------------------------------
+
+    public ScraperState getScraperState(String videoId) {
+        return scraperStates.get(videoId);
+    }
 
     private void waitForChatIframe(Page page) {
         page.waitForSelector("iframe#chatframe",
@@ -479,6 +512,7 @@ public class YTChatScraperService {
             log.warn("Target page closed unexpectedly for video {}. Restarting scraper...", videoId);
             // Optionally restart the scraper if needed.
         } else {
+//            log.error("Playwright error for video {}", videoId);
             log.error("Playwright error for video {}: {}", videoId, pwe.getMessage(), pwe);
         }
     }
@@ -502,5 +536,61 @@ public class YTChatScraperService {
         }
         // Fallback if none of the above patterns match:
         return "Playwright error: " + rawMsg;
+    }
+
+//    @Async("chatScraperExecutor")
+//    public CompletableFuture<Void> scrapeChannelPool(String videoId, Set<Language> skipLangs) {
+//        validateVideoId(videoId);
+//
+//        if (activeFutures.containsKey(videoId)) {
+//            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
+//            return CompletableFuture.completedFuture(null);
+//        }
+//
+//        ScraperState state = initializeScraperState(videoId);
+//        CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
+//        activeFutures.put(videoId, scraperFuture);
+//        state.setSkipLangs(skipLangs);
+//
+//        chatScraperExecutor.execute(() -> {
+//            PlaywrightWorker worker = null;
+//            try {
+//                semaphore.acquire();
+//                worker = playwrightWorkerPool.acquireWorker();
+//                // Execute scraping logic on the worker's dedicated thread.
+//                PlaywrightWorker finalWorker = worker;
+//                worker.submit(() -> {
+//                    scrapeChat(finalWorker.getPage(), videoId, state, scraperFuture, skipLangs);
+//                    return null;
+//                });
+//            } catch (Exception ex) {
+//                handleOuterException(videoId, ex, scraperFuture, state);
+//            } finally {
+//                if (worker != null) {
+//                    playwrightWorkerPool.releaseWorker(worker);
+//                }
+//                semaphore.release();
+//            }
+//        });
+//
+//        return scraperFuture;
+//    }
+
+    @Scheduled(fixedRate = 600_000) // Run every 10 minutes
+    public void cleanupFailedScrapers() {
+        Instant now = Instant.now();
+        Iterator<Map.Entry<String, ScraperState>> iterator = scraperStates.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<String, ScraperState> entry = iterator.next();
+            ScraperState state = entry.getValue();
+
+            if (state.getStatus() == ScraperState.Status.FAILED &&
+                    Duration.between(state.getCreatedAt(), now).compareTo(FAILED_SCRAPER_CLEANUP_THRESHOLD) > 0) {
+
+                iterator.remove(); // Remove the failed scraper state
+                log.info("Removed failed scraper for video {} (exceeded timeout)", entry.getKey());
+            }
+        }
     }
 }

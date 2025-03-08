@@ -1,6 +1,8 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
+import csw.youtube.chat.live.dto.MessagesRequest;
+import csw.youtube.chat.live.dto.MetricsUpdateRequest;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.KeywordRankingService;
 import csw.youtube.chat.live.service.YTChatScraperService;
@@ -17,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
@@ -27,6 +30,39 @@ public class ScraperController {
 
     private final YTChatScraperService scraperService;
     private final KeywordRankingService keywordRankingService;
+
+    @PostMapping("/updateMetrics")
+    public ResponseEntity<Void> updateMetrics(@RequestBody MetricsUpdateRequest request) {
+        Map<String, ScraperState> scraperStates = scraperService.getScraperStates();
+        ScraperState state = scraperStates.computeIfAbsent(request.videoId(), ScraperState::new);
+
+        Set<Language> skipLangs = parseLanguages(request.skipLangs().subList(0, 5));
+        int lastThroughput = request.messagesInLastInterval();
+        state.setLastThroughput(lastThroughput);
+        state.getTotalMessages().addAndGet(lastThroughput);
+
+        long intervals = state.getIntervalsCount().incrementAndGet();
+        double newAvg = intervals == 1
+                ? lastThroughput
+                : (state.getAverageThroughput() * (intervals - 1) + lastThroughput) / intervals;
+
+        state.setCreatedAt(request.createdAt());
+        state.setVideoTitle(request.videoTitle());
+        state.setChannelName(request.channelName());
+        state.setAverageThroughput(newAvg);
+        state.setMaxThroughput(Math.max(lastThroughput, state.getMaxThroughput()));
+        state.setStatus(ScraperState.Status.valueOf(request.status())); // FIXED
+        state.setSkipLangs(skipLangs);
+
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/messages")
+    public ResponseEntity<Void> processMessages(@RequestBody MessagesRequest request) {
+        scraperService.processChatMessages(request.videoId(), request.messages());
+        return ResponseEntity.ok().build();
+    }
+
 
     @PostMapping("/{videoId}/start")
     public ResponseEntity<Map<String, String>> startScraper(
@@ -98,6 +134,7 @@ public class ScraperController {
         }
 
         scraperService.scrapeChannel(videoId, skipLangs);
+//        scraperService.scrapeChannelPool(videoId, skipLangs);
         String encodedMsg = URLEncoder.encode("Scraper started for video " + videoId, StandardCharsets.UTF_8);
 
         HttpHeaders headers = new HttpHeaders();

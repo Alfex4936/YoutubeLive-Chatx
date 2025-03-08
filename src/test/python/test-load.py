@@ -78,7 +78,7 @@ class ScraperUser(HttpUser):
 
     def call_scraper_api(self, video_id):
         """Call the /start-scraper API to trigger scrapers for each video ID."""
-        url = f"/start-scraper?videoId={video_id}"
+        url = f"/scrapers/start-scraper?videoId={video_id}"
         with self.client.get(url, name="Start Scraper", catch_response=True) as response:
             if response.status_code == 302:
                 response.success()

@@ -43,9 +43,14 @@ public class PlaywrightBrowserManager {
         // Create a fresh context/page each time, but same thread & same holder
         try (BrowserContext ctx = holder.createContext(contextOptions);
              Page page = ctx.newPage()) {
-            pageConsumer.accept(page);
+            try {
+                pageConsumer.accept(page);
+            } catch (Exception e) {
+                log.error("Error during page operation on thread {}", Thread.currentThread().getName(), e);
+                throw e;
+            }
         } catch (Exception e) {
-            log.error("Error using PlaywrightBrowserHolder on thread {}", Thread.currentThread().getName(), e);
+            log.error("Error creating or using page in PlaywrightBrowserHolder on thread {}", Thread.currentThread().getName(), e);
             throw new RuntimeException("Failed browser operation", e);
         }
     }

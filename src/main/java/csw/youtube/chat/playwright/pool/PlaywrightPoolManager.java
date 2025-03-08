@@ -15,7 +15,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-@Component
 public class PlaywrightPoolManager {
     private final Map<Thread, PlaywrightBrowserHolder> threadBrowserMap = new ConcurrentHashMap<>();
     private final ScheduledExecutorService healthCheckExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -23,7 +22,7 @@ public class PlaywrightPoolManager {
     @PostConstruct
     public void init() {
         // Schedule browser health checks every 5 minutes
-        healthCheckExecutor.scheduleAtFixedRate(this::checkBrowserHealth, 5, 5, TimeUnit.MINUTES);
+        // healthCheckExecutor.scheduleAtFixedRate(this::checkBrowserHealth, 5, 5, TimeUnit.MINUTES);
     }
 
     public PlaywrightBrowserHolder getBrowser() {

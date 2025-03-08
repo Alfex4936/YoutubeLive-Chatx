@@ -1,5 +1,6 @@
 package csw.youtube.chat.common.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -11,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 
+@Slf4j
 @Configuration
 @EnableAsync
 public class AsyncConfig {
@@ -21,6 +23,10 @@ public class AsyncConfig {
     public Executor chatScraperExecutor() {
         ThreadFactory vtFactory = Thread.ofVirtual()
                 .name("yt-scraper-", 0)
+                .uncaughtExceptionHandler((thread, throwable) -> {
+                    log.error("Uncaught exception in virtual thread: {}", thread.getName(), throwable);
+                })
+                // .inheritInheritableThreadLocals()
                 .factory();
         // One new virtual thread per task
         return Executors.newThreadPerTaskExecutor(vtFactory);

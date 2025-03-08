@@ -41,3 +41,16 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어오는 프로젝트
 
 ### 기타 스크린샷
 ![Image](https://github.com/user-attachments/assets/253585cc-5cf1-42bc-8b45-7729e851ad4b)
+
+## 브라우저 방법
+
+최고의 방법은 무엇일까?...
+
+일단 Playwright는 thread-safe 하지 않아 같은 쓰레드가 작업해야한다.
+
+시도한 방법들
+1. Browser pool 을 미리 만들어서 사용 -> Object 없어짐
+2. 각 VT를 저장해서 scraper 마다 VT 실행 -> 근본
+3. Rust언어를 통해 정말 간단한 Scraper 프로세스만 만들기
+   - JVM 없이 CPU, 메모리를 적게 먹으면서 크롬 실행 잘됨
+   - 배치를 통해 자바 서버에 metrics를 보내줌
