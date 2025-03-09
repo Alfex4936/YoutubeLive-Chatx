@@ -1,5 +1,7 @@
 // src/main.rs
 use anyhow::{Context, Result};
+
+use chromiumoxide::cdp::browser_protocol::system_info::ProcessInfo;
 use chromiumoxide::{detection::{default_executable, DetectionOptions}, handler::viewport::Viewport, Browser, BrowserConfig, Element, Page};
 use chrono::Utc;
 use clap::Parser;
@@ -64,6 +66,8 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::spawn(handle_signals(Arc::clone(&is_running)));
 
+    eprintln!("💻 Starting scraper for video: {}", args.video_id);
+
     // First set to IDLE
     send_metrics(&client, &args.video_id, &[], ScraperStatus::Idle, &created_at, None, None, 0, 0).await?;
 
@@ -71,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     let scrape_result = scraper_main_logic(&args, &client, &created_at, Arc::clone(&total_messages), Arc::clone(&is_running)).await;
 
     if let Err(ref e) = scrape_result {
-        eprintln!("❌ Scraper encountered an error: {:?}", e);
+        eprintln!("❌ Scraper encountered an error");
 
         // Notify Java backend about scraper failure.
         let _ = send_metrics(
@@ -114,6 +118,8 @@ async fn scraper_main_logic(
 
     wait_for_selector(&page, "iframe#chatframe").await?;
     let iframe_url = get_iframe_url(&page).await?;
+
+    #[cfg(debug_assertions)]
     println!("🔗 Found chat iframe URL: {}", iframe_url);
 
     let video_title: String = page.evaluate(js_scripts::VIDEO_TITLE).await?.into_value().unwrap_or_default();
@@ -147,19 +153,19 @@ async fn scraper_main_logic(
     let mut last_message_time = Instant::now();
     let mut last_chat_check = Instant::now();
 
-    // let mut sys = System::new_all();
+    let mut sys = System::new_all();
     loop {
         if !is_running.load(Ordering::SeqCst) {
             break;
         }
 
         // Prepare the list of PIDs to update: always include the current process.
-        // let current_pid = get_current_pid().expect("Failed to get current PID");
-        // let pids = vec![current_pid];
-        // sys.refresh_processes(ProcessesToUpdate::Some(&pids), true);
+        let current_pid = get_current_pid().expect("Failed to get current PID");
+        let pids = vec![current_pid];
+        sys.refresh_processes(ProcessesToUpdate::Some(&pids), true);
 
-        // // Log resource usage for the current Rust process.
-        // log_rust_usage(&sys);
+        // Log resource usage for the current Rust process.
+        log_rust_usage(&sys);
 
         let mut batch = Vec::new(); // Pre-allocate empty batch
 
@@ -173,6 +179,7 @@ async fn scraper_main_logic(
             send_messages_to_backend(&client, &args.video_id, &batch).await?;
         }
         //  else if Instant::now().duration_since(last_message_time) >= inactivity_limit {
+        //     #[cfg(debug_assertions)]
         //     println!("❗️ No messages received for 30 minutes. Exiting scraper loop.");
         //     break;
         // }
@@ -180,6 +187,9 @@ async fn scraper_main_logic(
         let interval_messages = batch.len();
         total_messages.fetch_add(interval_messages, Ordering::SeqCst);
 
+        if !is_running.load(Ordering::SeqCst) {
+            break;
+        }
         send_metrics(
             &client,
             &args.video_id,
@@ -198,6 +208,7 @@ async fn scraper_main_logic(
         // After 15 minutes of inactivity, check via HTTP request if chat is really dead
         if time_since_last_message >= check_chat_deadline && Instant::now().duration_since(last_chat_check) >= Duration::from_secs(60) {
             if has_live_chat_ended(&client, &iframe_url).await? {
+                #[cfg(debug_assertions)]
                 println!("🔴 Live chat is unavailable (detected via HTTP request). Stopping.");
                 break;
             }
@@ -206,12 +217,17 @@ async fn scraper_main_logic(
     
         // If no activity for 30 minutes, exit without checking further
         if time_since_last_message >= inactivity_limit {
+            #[cfg(debug_assertions)]
             println!("⏳ No messages for 30 minutes. Exiting.");
             break;
         }
     
 
         sleep(Duration::from_secs(10)).await;
+
+        if !is_running.load(Ordering::SeqCst) {
+            break;
+        }
     }
 
     send_metrics(
@@ -237,17 +253,25 @@ async fn scraper_main_logic(
 async fn handle_signals(is_running: Arc<AtomicBool>) {
     wait_for_signal().await;
     is_running.store(false, Ordering::SeqCst);
+    #[cfg(debug_assertions)]
     println!("Graceful shutdown triggered");
 }
 
 #[cfg(unix)]
 async fn wait_for_signal() {
+    use tokio::io::{self, AsyncBufReadExt, BufReader};
     use tokio::signal::unix::{signal, SignalKind};
 
     let mut signal_terminate = signal(SignalKind::terminate()).unwrap();
     let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
 
+    let mut stdin = BufReader::new(io::stdin()).lines();
+
     tokio::select! {
+        _ = stdin.next_line() => {
+            #[cfg(debug_assertions)]
+            println!("Detected parent process exit. Shutting down...");
+        }
         _ = signal_terminate.recv() => println!("Received SIGTERM."),
         _ = signal_interrupt.recv() => println!("Received SIGINT."),
     };
@@ -255,14 +279,20 @@ async fn wait_for_signal() {
 
 #[cfg(windows)]
 async fn wait_for_signal() {
-    use tokio::signal::windows;
+    use tokio::{io::{self, AsyncBufReadExt, BufReader}, signal::windows};
 
     let mut signal_c = windows::ctrl_c().unwrap();
     let mut signal_break = windows::ctrl_break().unwrap();
     let mut signal_close = windows::ctrl_close().unwrap();
     let mut signal_shutdown = windows::ctrl_shutdown().unwrap();
 
+    let mut stdin = BufReader::new(io::stdin()).lines();
+
     tokio::select! {
+        _ = stdin.next_line() => { // Detect Java killing Rust by closing `stdin`
+            #[cfg(debug_assertions)]
+            println!("Detected parent process exit. Shutting down...");
+        }
         _ = signal_c.recv() => println!("Received CTRL_C."),
         _ = signal_break.recv() => println!("Received CTRL_BREAK."),
         _ = signal_close.recv() => println!("Received CTRL_CLOSE."),
@@ -414,12 +444,14 @@ async fn handle_chat_events(page: Page, message_batch: Arc<Mutex<Vec<ChatMessage
 fn log_rust_usage(sys: &System) {
     let current_pid = get_current_pid().expect("Failed to get current PID");
     if let Some(process) = sys.process(current_pid) {
+        #[cfg(debug_assertions)]
         println!(
             "💻 Rust Process - CPU: {:.2}%, Memory: {:.2} MB",
             process.cpu_usage(),
             process.memory() as f64 / (1024.0 * 1024.0) // Convert bytes to MB
         );
     } else {
+        #[cfg(debug_assertions)]
         println!("Could not retrieve Rust process info.");
     }
 }
@@ -436,7 +468,6 @@ async fn has_live_chat_ended(client: &Client, iframe_url: &str) -> anyhow::Resul
     // Check if the response contains "채팅을 사용할 수 없는 실시간 스트림입니다."
     Ok(res.contains("채팅을 사용할 수 없는 실시간 스트림입니다."))
 }
-
 
 /*
 <yt-formatted-string id="text" class="style-scope yt-live-chat-message-renderer">

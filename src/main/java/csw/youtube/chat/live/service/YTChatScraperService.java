@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -62,7 +63,7 @@ public class YTChatScraperService {
 
     // private final ChatBroadcastService chatBroadcastService;
     private final ProfanityLogService profanityLogService;
-    private final KeywordRankingService keywordRankingService;
+    private final RankingService rankingService;
 
     /**
      * Executor for running chat scraping tasks asynchronously (uses virtual threads).
@@ -75,23 +76,62 @@ public class YTChatScraperService {
     /* POOL TEST */
     // private final PlaywrightPoolManager playwrightPoolManager;
     // private final PlaywrightWorkerPool playwrightWorkerPool;
+    private final String RUST_SCRAPER_PATH = "src/main/resources/ytchatx-scraper.exe"; // Rust binary path
+    private final Map<String, Process> activeScrapers = new ConcurrentHashMap<>();
+    private final ExecutorService processExecutor = Executors.newCachedThreadPool(); // Handles process execution
 
     public YTChatScraperService(
             //ChatBroadcastService chatBroadcastService,
             ProfanityLogService profanityLogService,
-            KeywordRankingService keywordRankingService,
+            RankingService rankingService,
             @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
             PlaywrightBrowserManager playwrightBrowserManager
             //PlaywrightPoolManager playwrightPoolManager, PlaywrightWorkerPool playwrightWorkerPool
     ) {
         //this.chatBroadcastService = chatBroadcastService;
         this.profanityLogService = profanityLogService;
-        this.keywordRankingService = keywordRankingService;
+        this.rankingService = rankingService;
         this.chatScraperExecutor = chatScraperExecutor;
         this.playwrightBrowserManager = playwrightBrowserManager;
 //        this.playwrightPoolManager = playwrightPoolManager;
 //        this.playwrightWorkerPool = playwrightWorkerPool;
     }
+
+//    @Async("scraperExecutor")
+//    public CompletableFuture<Void> scrapeChannelWithPool(String videoId, Set<Language> skipLangs) {
+//        // Validate the video ID
+//        validateVideoId(videoId);
+//
+//        // Check for existing scrapers to avoid duplicates
+//        if (activeFutures.containsKey(videoId)) {
+//            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
+//            return CompletableFuture.completedFuture(null);
+//        }
+//
+//        // Initialize scraper state and future
+//        ScraperState state = initializeScraperState(videoId);
+//        CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
+//        activeFutures.put(videoId, scraperFuture);
+//
+//        // Execute scraping with a pooled browser page
+//        try {
+//            playwrightPoolManager.withPage(page -> {
+//                scrapeChat(page, videoId, state, scraperFuture, skipLangs);
+//                return null;
+//            });
+//        } catch (Exception ex) {
+//            handleOuterException(videoId, ex, scraperFuture, state);
+//        } finally {
+//            cleanupScraper(videoId); // Ensure cleanup (e.g., remove from activeFutures)
+//        }
+//
+//        // Return the future immediately for the caller to track completion
+//        return scraperFuture;
+//    }
+
+    // ------------------------------------------------------------------------
+    //  Refactored Private Methods
+    // ------------------------------------------------------------------------
 
     @PostConstruct
     public void cleanupOrphanProcesses() {
@@ -102,7 +142,7 @@ public class YTChatScraperService {
     @PreDestroy
     public void onDestroy() {
         // Stop all active scrapers so they don’t queue new tasks
-        activeFutures.keySet().forEach(this::stopScraper);
+        // activeFutures.keySet().forEach(this::stopScraper);
         activeScrapers.keySet().forEach(this::stopRustScraper);
     }
 
@@ -154,42 +194,6 @@ public class YTChatScraperService {
 
         return scraperFuture;
     }
-
-//    @Async("scraperExecutor")
-//    public CompletableFuture<Void> scrapeChannelWithPool(String videoId, Set<Language> skipLangs) {
-//        // Validate the video ID
-//        validateVideoId(videoId);
-//
-//        // Check for existing scrapers to avoid duplicates
-//        if (activeFutures.containsKey(videoId)) {
-//            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
-//            return CompletableFuture.completedFuture(null);
-//        }
-//
-//        // Initialize scraper state and future
-//        ScraperState state = initializeScraperState(videoId);
-//        CompletableFuture<Void> scraperFuture = new CompletableFuture<>();
-//        activeFutures.put(videoId, scraperFuture);
-//
-//        // Execute scraping with a pooled browser page
-//        try {
-//            playwrightPoolManager.withPage(page -> {
-//                scrapeChat(page, videoId, state, scraperFuture, skipLangs);
-//                return null;
-//            });
-//        } catch (Exception ex) {
-//            handleOuterException(videoId, ex, scraperFuture, state);
-//        } finally {
-//            cleanupScraper(videoId); // Ensure cleanup (e.g., remove from activeFutures)
-//        }
-//
-//        // Return the future immediately for the caller to track completion
-//        return scraperFuture;
-//    }
-
-    // ------------------------------------------------------------------------
-    //  Refactored Private Methods
-    // ------------------------------------------------------------------------
 
     /**
      * Stops the scraper for the given video ID if it is currently active.
@@ -368,7 +372,7 @@ public class YTChatScraperService {
             profanityLogService.logIfProfane(username, messageText);
 
             // Offload the keyword ranking update asynchronously using the executor.
-            chatScraperExecutor.execute(() -> keywordRankingService.updateKeywordRanking(videoId, messageText, skipLangs));
+            chatScraperExecutor.execute(() -> rankingService.updateKeywordRanking(videoId, messageText, skipLangs));
 
             return null;
         });
@@ -389,8 +393,10 @@ public class YTChatScraperService {
             // Profanity / keyword logic
             profanityLogService.logIfProfane(username, message);
 
+            chatScraperExecutor.execute(() -> rankingService.updateLanguageStats(videoId, message));
+
             // Offload the keyword ranking update asynchronously using the executor.
-            chatScraperExecutor.execute(() -> keywordRankingService.updateKeywordRanking(videoId, message, skipLangs));
+            chatScraperExecutor.execute(() -> rankingService.updateKeywordRanking(videoId, message, skipLangs));
         }
     }
 
@@ -441,6 +447,10 @@ public class YTChatScraperService {
         }
     }
 
+    // ------------------------------------------------------------------------
+    // Helper Methods
+    // ------------------------------------------------------------------------
+
     /**
      * Called in a finally block after scraping is done or fails, ensuring the page is closed gracefully.
      */
@@ -476,10 +486,6 @@ public class YTChatScraperService {
         state.setErrorMessage("Outer error: " + ex.getMessage());
     }
 
-    // ------------------------------------------------------------------------
-    // Helper Methods
-    // ------------------------------------------------------------------------
-
     public ScraperState getScraperState(String videoId) {
         return scraperStates.get(videoId);
     }
@@ -509,42 +515,6 @@ public class YTChatScraperService {
         page.waitForSelector("ytd-watch-metadata",
                 new Page.WaitForSelectorOptions().setTimeout(PLAYWRIGHT_TIMEOUT_MS));
         return page.evaluate(YouTubeChatScriptProvider.extractVideoTitle()).toString();
-    }
-
-    String extractChannelName(Page page) {
-        log.debug("Extracting channel name.");
-        return page.evaluate(YouTubeChatScriptProvider.extractChannelName()).toString();
-    }
-
-    void handlePlaywrightException(String videoId, PlaywrightException pwe) {
-        if (pwe.getMessage().contains("TargetClosedError")) {
-            log.warn("Target page closed unexpectedly for video {}. Restarting scraper...", videoId);
-            // Optionally restart the scraper if needed.
-        } else {
-//            log.error("Playwright error for video {}", videoId);
-            log.error("Playwright error for video {}: {}", videoId, pwe.getMessage(), pwe);
-        }
-    }
-
-    private String parsePlaywrightError(PlaywrightException e) {
-        String rawMsg = e.getMessage();
-        if (rawMsg == null) {
-            return "Unknown Playwright error (no message).";
-        }
-        String lowerMsg = rawMsg.toLowerCase();
-
-        if (lowerMsg.contains("timeouterror") || lowerMsg.contains("timeout 10000ms exceeded")) {
-            // This likely means the chat iframe didn't appear in time
-            return "Chat iframe not found. The video may not be live or chat is disabled.";
-        }
-        if (lowerMsg.contains("net::err_name_not_resolved")) {
-            return "Network issue: could not resolve the host. Check your internet connection or URL.";
-        }
-        if (lowerMsg.contains("net::err_internet_disconnected")) {
-            return "No internet connection, or YouTube is unreachable.";
-        }
-        // Fallback if none of the above patterns match:
-        return "Playwright error: " + rawMsg;
     }
 
 //    @Async("chatScraperExecutor")
@@ -585,6 +555,42 @@ public class YTChatScraperService {
 //        return scraperFuture;
 //    }
 
+    String extractChannelName(Page page) {
+        log.debug("Extracting channel name.");
+        return page.evaluate(YouTubeChatScriptProvider.extractChannelName()).toString();
+    }
+
+    void handlePlaywrightException(String videoId, PlaywrightException pwe) {
+        if (pwe.getMessage().contains("TargetClosedError")) {
+            log.warn("Target page closed unexpectedly for video {}. Restarting scraper...", videoId);
+            // Optionally restart the scraper if needed.
+        } else {
+//            log.error("Playwright error for video {}", videoId);
+            log.error("Playwright error for video {}: {}", videoId, pwe.getMessage(), pwe);
+        }
+    }
+
+    private String parsePlaywrightError(PlaywrightException e) {
+        String rawMsg = e.getMessage();
+        if (rawMsg == null) {
+            return "Unknown Playwright error (no message).";
+        }
+        String lowerMsg = rawMsg.toLowerCase();
+
+        if (lowerMsg.contains("timeouterror") || lowerMsg.contains("timeout 10000ms exceeded")) {
+            // This likely means the chat iframe didn't appear in time
+            return "Chat iframe not found. The video may not be live or chat is disabled.";
+        }
+        if (lowerMsg.contains("net::err_name_not_resolved")) {
+            return "Network issue: could not resolve the host. Check your internet connection or URL.";
+        }
+        if (lowerMsg.contains("net::err_internet_disconnected")) {
+            return "No internet connection, or YouTube is unreachable.";
+        }
+        // Fallback if none of the above patterns match:
+        return "Playwright error: " + rawMsg;
+    }
+
     @Scheduled(fixedRate = 600_000) // Run every 10 minutes
     public void cleanupFailedScrapers() {
         Instant now = Instant.now();
@@ -603,9 +609,6 @@ public class YTChatScraperService {
         }
     }
 
-    private final String RUST_SCRAPER_PATH = "src/main/resources/ytchatx-scraper.exe"; // Rust binary path
-    private final Map<String, Process> activeScrapers = new ConcurrentHashMap<>();
-    private final ExecutorService processExecutor = Executors.newCachedThreadPool(); // Handles process execution
     /**
      * Starts the Rust scraper binary for a given videoId.
      */
@@ -622,7 +625,9 @@ public class YTChatScraperService {
 
             // Redirect logs to avoid blocking Java process
             processBuilder.redirectErrorStream(true);
-            processBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT); // Print logs to Java output OR use file
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+//            processBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
+//            processBuilder.redirectInput(ProcessBuilder.Redirect.PIPE);
 
             Process process = processBuilder.start();
             activeScrapers.put(videoId, process);
@@ -672,6 +677,18 @@ public class YTChatScraperService {
         }
     }
 
+    // TODO send error msg
+    public void sendCommandToRust(String videoId, Process process) {
+        try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream())) {
+            writer.write("p\n");  // Send command
+            writer.flush();
+            System.out.println("✅ Sent command to Rust");
+        } catch (IOException e) {
+            log.error("Error sending command to Rust for video {}", e.getMessage());
+        }
+    }
+
+
     /**
      * Stops the Rust scraper process for the given video ID.
      * Ensures that no orphan processes are left running.
@@ -686,28 +703,10 @@ public class YTChatScraperService {
             return "No active scraper found for video ID: " + videoId;
         }
 
-        try {
-            // First, attempt graceful shutdown
-            process.destroy();
-            boolean exited = process.waitFor(15, TimeUnit.SECONDS); // Wait for up to 15 seconds
+        sendCommandToRust(videoId, process);
 
-            if (!exited) {
-                log.warn("Rust scraper did not terminate, forcing shutdown...");
-                process.destroyForcibly(); // Force kill process
-                process.waitFor(15, TimeUnit.SECONDS); // Give it 15 more seconds to exit
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            process.destroyForcibly(); // Ensure it gets stopped
-        }
-
-        // 🔥 Kill any orphaned Chrome processes
-        cleanupOrphanedChromeProcesses();
-
-        // Ensure the process is fully terminated
-        if (process.isAlive()) {
-            log.error("Rust process for video {} is still running! Manual intervention required.", videoId);
-        }
+        // Java 9+ non-blocking `onExit()`
+        process.onExit().thenRun(() -> log.info("✅ Rust process for video {} exited cleanly.", videoId));
 
         // Update scraper state
         ScraperState state = scraperStates.get(videoId);
@@ -716,24 +715,37 @@ public class YTChatScraperService {
             state.setErrorMessage("Stopped by user.");
         }
 
-        log.info("Scraper stopped for video ID: {}", videoId);
         return "Scraper stopped for video ID: " + videoId;
     }
 
-
     private void cleanupOrphanedChromeProcesses() {
-        log.info("Cleaning up any orphaned Chrome processes...");
+        log.info("🧹 Cleaning up orphaned Chrome & Rust scraper processes...");
 
+        // Send STOP command to all active Rust scrapers
+        for (Map.Entry<String, Process> entry : activeScrapers.entrySet()) {
+            String videoId = entry.getKey();
+            Process process = entry.getValue();
+
+            sendCommandToRust(videoId, process); // Send "STOP" command
+        }
+
+        // Wait a few seconds for Rust to exit gracefully
+        try {
+            Thread.sleep(5000); // Give scrapers time to exit
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Kill any remaining orphaned Rust scrapers
         try {
             if (System.getProperty("os.name").toLowerCase().contains("win")) {
                 new ProcessBuilder("taskkill", "/F", "/IM", "ytchatx-scraper.exe").start();
             } else {
                 new ProcessBuilder("pkill", "-f", "ytchatx-scraper").start();
             }
-            log.info("Orphaned Chrome processes killed.");
+            log.info("✅ Orphaned Chrome & Rust scraper processes killed.");
         } catch (IOException e) {
-            log.error("Failed to clean up orphaned Chrome processes.", e);
+            log.error("❌ Failed to clean up orphaned Chrome processes.", e);
         }
     }
-
 }

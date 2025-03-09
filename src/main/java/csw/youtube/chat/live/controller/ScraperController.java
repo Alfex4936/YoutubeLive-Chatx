@@ -4,7 +4,7 @@ import com.github.pemistahl.lingua.api.Language;
 import csw.youtube.chat.live.dto.MessagesRequest;
 import csw.youtube.chat.live.dto.MetricsUpdateRequest;
 import csw.youtube.chat.live.model.ScraperState;
-import csw.youtube.chat.live.service.KeywordRankingService;
+import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTChatScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
@@ -29,7 +28,7 @@ import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 public class ScraperController {
 
     private final YTChatScraperService scraperService;
-    private final KeywordRankingService keywordRankingService;
+    private final RankingService rankingService;
 
     @PostMapping("/updateMetrics")
     public ResponseEntity<Void> updateMetrics(@RequestBody MetricsUpdateRequest request) {
@@ -207,6 +206,6 @@ public class ScraperController {
 
     @GetMapping("/keyword-ranking")
     public java.util.Set<ZSetOperations.TypedTuple<String>> getKeywords(@RequestParam String videoId, @RequestParam int k) {
-        return keywordRankingService.getTopKeywords(videoId, k);
+        return rankingService.getTopKeywords(videoId, k);
     }
 }

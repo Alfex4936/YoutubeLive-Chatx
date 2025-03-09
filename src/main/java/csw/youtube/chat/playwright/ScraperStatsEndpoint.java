@@ -4,7 +4,7 @@ import com.github.pemistahl.lingua.api.Language;
 import com.sun.management.OperatingSystemMXBean;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.model.ScraperState;
-import csw.youtube.chat.live.service.KeywordRankingService;
+import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTChatScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
@@ -16,14 +16,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-// GET http://localhost:8080/actuator/scraper-stats
+// GET http://localhost:8080/actuator/scraperStats
 @Component
-@Endpoint(id = "scraper-stats")
+@Endpoint(id = "scraperStats")
 @RequiredArgsConstructor
 public class ScraperStatsEndpoint {
 
     private final YTChatScraperService ytChatScraperService;
-    private final KeywordRankingService keywordRankingService;
+    private final RankingService rankingService;
 
     @ReadOperation
     public Map<String, Object> getScraperStats() {
@@ -51,8 +51,10 @@ public class ScraperStatsEndpoint {
                 runningScraperCount++;
             }
 
+            Map<String, Double> topLanguages = rankingService.getTopLanguages(videoId, 3);
+
             // Retrieve top 5 keywords
-            List<KeywordRankingPair> topKeywordsWithScores = keywordRankingService.getTopKeywordStrings(videoId, 5);
+            List<KeywordRankingPair> topKeywordsWithScores = rankingService.getTopKeywordStrings(videoId, 5);
 
             long runningTimeMinutes = 0;
             if (isRunning) {
@@ -72,6 +74,7 @@ public class ScraperStatsEndpoint {
                     state.getAverageThroughput(),
                     state.getTotalMessages().get(),
                     topKeywordsWithScores,
+                    topLanguages, // %
                     state.getThreadName(),
                     state.getCreatedAt(),
                     state.getErrorMessage()
@@ -136,6 +139,7 @@ public class ScraperStatsEndpoint {
             double averageThroughput,
             long totalMessages,
             List<KeywordRankingPair> topKeywords,
+            Map<String, Double> topLanguages,
             String threadName,
             Instant createdAt,
             String errorMessage

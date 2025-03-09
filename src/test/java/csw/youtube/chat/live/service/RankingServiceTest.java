@@ -26,7 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class KeywordRankingServiceTest {
+public class RankingServiceTest {
 
     @Mock
     private RedisTemplate<String, String> redisTemplate;
@@ -37,13 +37,13 @@ public class KeywordRankingServiceTest {
     @Mock
     private LanguageDetector globalLanguageDetector;
 
-    private KeywordRankingService service;
+    private RankingService service;
 
     @BeforeEach
     public void setup() {
 
         // Create the service with mocked dependencies.
-        service = new KeywordRankingService(redisTemplate, globalLanguageDetector);
+        service = new RankingService(redisTemplate, globalLanguageDetector);
         // Call initIgnoreKeywords so that the ignoreKeywords set gets populated.
         // To simulate a file existing in the classpath, we can create a temporary file in the target test-classes directory.
         try {
@@ -62,22 +62,22 @@ public class KeywordRankingServiceTest {
     // --- Tests for static helper methods ---
     @Test
     void testIsNumeric() {
-        assertTrue(KeywordRankingService.isNumeric("123"));
-        assertTrue(KeywordRankingService.isNumeric("12.3"));
-        assertTrue(KeywordRankingService.isNumeric("-33"));
-        assertTrue(KeywordRankingService.isNumeric("-33.3"));
-        assertFalse(KeywordRankingService.isNumeric("abc"));
-        assertFalse(KeywordRankingService.isNumeric("12a"));
-        assertFalse(KeywordRankingService.isNumeric(""));
-        assertFalse(KeywordRankingService.isNumeric("-"));
+        assertTrue(RankingService.isNumeric("123"));
+        assertTrue(RankingService.isNumeric("12.3"));
+        assertTrue(RankingService.isNumeric("-33"));
+        assertTrue(RankingService.isNumeric("-33.3"));
+        assertFalse(RankingService.isNumeric("abc"));
+        assertFalse(RankingService.isNumeric("12a"));
+        assertFalse(RankingService.isNumeric(""));
+        assertFalse(RankingService.isNumeric("-"));
     }
 
     @Test
     void testIsSymbolOnly() {
-        assertTrue(KeywordRankingService.isSymbolOnly("???"));
-        assertTrue(KeywordRankingService.isSymbolOnly("..."));
-        assertFalse(KeywordRankingService.isSymbolOnly("a?"));
-        assertFalse(KeywordRankingService.isSymbolOnly("hello"));
+        assertTrue(RankingService.isSymbolOnly("???"));
+        assertTrue(RankingService.isSymbolOnly("..."));
+        assertFalse(RankingService.isSymbolOnly("a?"));
+        assertFalse(RankingService.isSymbolOnly("hello"));
     }
 
     // --- Test initIgnoreKeywords (using reflection to check the field) ---

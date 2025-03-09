@@ -17,19 +17,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class KeywordRankingService {
+public class RankingService {
 
     private static final int MAX_KEYWORDS = 200; // Configurable maximum ranking size
+    private static final int MAX_LANG_RANKINGS = 3; // top 3 langs
     // Expiration time for each video's keyword ranking key, e.g., minutes
     private static final long EXPIRATION_MINUTES = 120L;
 
@@ -215,4 +213,63 @@ public class KeywordRankingService {
                 .map(tuple -> new KeywordRankingPair(tuple.getValue(), tuple.getScore())) // Extract keyword + score
                 .collect(Collectors.toList());
     }
+
+    public void updateLanguageStats(String videoId, String message) {
+        Language detectedLang = globalLanguageDetector.detectLanguageOf(message);
+        if (detectedLang == Language.UNKNOWN) {
+            return; // 알 수 없는 언어는 카운트하지 않음
+        }
+
+        String key = "video:" + videoId + ":lang-stats";
+
+        // Redis Sorted Set (ZINCRBY) 사용하여 해당 언어 카운트 증가
+        redisTemplate.opsForZSet().incrementScore(key, detectedLang.name(), 1);
+        // 전체 메시지 개수도 증가 (TOTAL_MESSAGES 키)
+        redisTemplate.opsForZSet().incrementScore(key, "TOTAL_MESSAGES", 1);
+
+        Long total = redisTemplate.opsForZSet().size(key);
+        if (total != null && total > MAX_KEYWORDS) {
+            redisTemplate.opsForZSet().removeRange(key, 0, total - MAX_LANG_RANKINGS - 1);
+        }
+
+        // Redis TTL 설정 (기본 2시간 유지)
+        redisTemplate.expire(key, EXPIRATION_MINUTES, TimeUnit.MINUTES);
+    }
+
+    /*
+    📌 KOREAN: 80.5% 🟦
+    📌 ENGLISH: 10.2% 🟩
+    📌 JAPANESE: 5.3% 🟥
+    */
+    public Map<String, Double> getTopLanguages(String videoId, int topN) {
+        String key = "video:" + videoId + ":lang-stats";
+
+        // 전체 메시지 개수 가져오기
+        Double totalMessages = redisTemplate.opsForZSet().score(key, "TOTAL_MESSAGES");
+        if (totalMessages == null || totalMessages == 0) {
+            return Collections.emptyMap(); // 메시지가 없으면 빈 값 반환
+        }
+
+        // 상위 N개 언어 가져오기 (내림차순 정렬)
+        Set<ZSetOperations.TypedTuple<String>> topLangs =
+                redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, topN - 1);
+
+        // 결과 변환 (언어 -> 비율%)
+        Map<String, Double> langStats = new LinkedHashMap<>();
+        if (topLangs != null) {
+            for (ZSetOperations.TypedTuple<String> entry : topLangs) {
+                String lang = entry.getValue();
+                Double count = entry.getScore();
+                if (count == null || count == 0 || "TOTAL_MESSAGES".equals(lang)) {
+                    continue; // Skip "TOTAL_MESSAGES"
+                }
+                // 비율 계산 후 소수점 한 자리까지 반올림
+                double percentage = Math.round((count / totalMessages) * 1000.0) / 10.0;
+                langStats.put(lang, percentage);
+            }
+        }
+        return langStats;
+    }
+
+
 }
