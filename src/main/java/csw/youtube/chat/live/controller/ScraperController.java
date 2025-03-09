@@ -33,26 +33,28 @@ public class ScraperController {
 
     @PostMapping("/updateMetrics")
     public ResponseEntity<Void> updateMetrics(@RequestBody MetricsUpdateRequest request) {
-        Map<String, ScraperState> scraperStates = scraperService.getScraperStates();
-        ScraperState state = scraperStates.computeIfAbsent(request.videoId(), ScraperState::new);
+        ScraperState state = scraperService.getScraperStates()
+                .computeIfAbsent(request.videoId(), ScraperState::new);
 
-        Set<Language> skipLangs = parseLanguages(request.skipLangs().subList(0, 5));
+        List<String> limitedSkipLangs = request.skipLangs().subList(0, Math.min(5, request.skipLangs().size()));
+        Set<Language> skipLangs = parseLanguages(limitedSkipLangs);
         int lastThroughput = request.messagesInLastInterval();
+
         state.setLastThroughput(lastThroughput);
         state.getTotalMessages().addAndGet(lastThroughput);
+        state.setCreatedAt(request.createdAt());
+        state.setVideoTitle(request.videoTitle());
+        state.setChannelName(request.channelName());
+        state.setSkipLangs(skipLangs);
 
         long intervals = state.getIntervalsCount().incrementAndGet();
         double newAvg = intervals == 1
                 ? lastThroughput
                 : (state.getAverageThroughput() * (intervals - 1) + lastThroughput) / intervals;
 
-        state.setCreatedAt(request.createdAt());
-        state.setVideoTitle(request.videoTitle());
-        state.setChannelName(request.channelName());
         state.setAverageThroughput(newAvg);
         state.setMaxThroughput(Math.max(lastThroughput, state.getMaxThroughput()));
-        state.setStatus(ScraperState.Status.valueOf(request.status())); // FIXED
-        state.setSkipLangs(skipLangs);
+        state.setStatus(ScraperState.Status.valueOf(request.status()));
 
         return ResponseEntity.ok().build();
     }
@@ -117,7 +119,7 @@ public class ScraperController {
      * Starts the scraper for the given videoId.
      * Example: GET /start-scraper?videoId=abcd1234
      */
-    @GetMapping("/start-scraper")
+    @GetMapping("/start-scraper1")
     public ResponseEntity<Void> startScraper2(
             @RequestParam String videoId,
             @RequestParam(required = false) List<String> langs // e.g. ["ENGLISH","SPANISH","FRENCH"]
@@ -147,7 +149,7 @@ public class ScraperController {
      * Stops the scraper for the given videoId if active.
      * Example: GET /stop-scraper?videoId=test-channel
      */
-    @GetMapping("/stop-scraper")
+    @GetMapping("/stop-scraper1")
     public ResponseEntity<Void> stopScraper2(@RequestParam String videoId) {
         String result = scraperService.stopScraper(videoId);
 
@@ -160,6 +162,46 @@ public class ScraperController {
 
         // Return HTTP 302 (FOUND) Redirect Response
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    @GetMapping("/stop-scraper")
+    public ResponseEntity<Void> stopRustScraper(@RequestParam String videoId) {
+        String result = scraperService.stopRustScraper(videoId);
+
+        // Encode the message to be URL-safe
+        String encodedMsg = URLEncoder.encode(result, StandardCharsets.UTF_8);
+
+        // Set the Location header for redirection
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Location", "/scraper-monitor?message=" + encodedMsg);
+
+        // Return HTTP 302 (FOUND) Redirect Response
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    @GetMapping("/start-scraper")
+    public ResponseEntity<Void> startScraper3(@RequestParam String videoId,
+                                             @RequestParam(required = false) List<String> langs) {
+        // Keep max 5 languages
+        if (langs != null && langs.size() > 5) {
+            langs = langs.subList(0, 5);
+        }
+        Set<Language> skipLangs = parseLanguages(langs);
+
+        if (videoId.startsWith("http")) {
+            videoId = videoId.replace(YTChatScraperService.YOUTUBE_WATCH_URL, "");
+        }
+
+        boolean started = scraperService.startRustScraper(videoId, skipLangs);
+
+        if (!started) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(null); // 409 if already running
+        }
+
+        String encodedMsg = URLEncoder.encode("Scraper started for video " + videoId, StandardCharsets.UTF_8);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Location", "/scraper-monitor?message=" + encodedMsg);
+        return new ResponseEntity<>(headers, HttpStatus.FOUND); // 302 redirect
     }
 
 

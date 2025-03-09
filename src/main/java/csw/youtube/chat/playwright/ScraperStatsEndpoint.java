@@ -45,15 +45,20 @@ public class ScraperStatsEndpoint {
             String videoId = entry.getKey();
             ScraperState state = entry.getValue();
 
-            if (state.getStatus().name().equals("RUNNING")) {
+            boolean isRunning = state.getStatus().name().equals("RUNNING");
+
+            if (isRunning) {
                 runningScraperCount++;
             }
 
             // Retrieve top 5 keywords
             List<KeywordRankingPair> topKeywordsWithScores = keywordRankingService.getTopKeywordStrings(videoId, 5);
 
-            Instant createdAt = state.getCreatedAt();
-            long runningTimeMinutes = Duration.between(createdAt, Instant.now()).toMinutes();
+            long runningTimeMinutes = 0;
+            if (isRunning) {
+                Instant createdAt = state.getCreatedAt();
+                runningTimeMinutes = Duration.between(createdAt, Instant.now()).toMinutes();
+            }
 
             ScraperMetrics metrics = new ScraperMetrics(
                     state.getVideoTitle(),

@@ -14,3 +14,12 @@ futures = "0.3"
 chrono = "0.4.40"
 serde = "1.0.218"
 sysinfo = { version = "0.33.1", features = ["windows"] }
+tempfile = "3.18.0"
+
+[profile.release]
+codegen-units = 1       # Improves performance by enabling more optimizations
+lto = "fat"             # Enables Link-Time Optimization for better performance
+strip = "symbols"       # Strips debug symbols to reduce binary size
+panic = "abort"         # Removes panic handling runtime for smaller binaries
+opt-level = 3           # Maximizes optimizations for performance
+debug = false           # Removes debug information

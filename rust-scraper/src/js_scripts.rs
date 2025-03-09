@@ -87,3 +87,9 @@ pub const CHAT_OBSERVER: &str = r##"
     }
 })();
 "##;
+
+pub const CHAT_ENDED_CHECK: &str = r#"
+    (() => {
+        return !!document.querySelector('yt-formatted-string#text.style-scope.yt-live-chat-message-renderer');
+    })()
+"#;

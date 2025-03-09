@@ -12,12 +12,14 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어오는 프로젝트
   Chrome 모킹 및 브라우저 자동화를 통한 데이터 수집
 - **Spring Boot 3.4 (VT on)**  
   API 서버 구현
-- **Java 23**  
+- **Java 23 lang**  
   최신 자바 기능 활용
 - **Postgres 17**  
   욕설 필터링, 로그 저장 등 데이터 관리
 - **WebSocket (SockJS)**  
   실시간 데이터 전송
+- **Rust lang**  
+  간단한 Scraper 작업 프로세스 분리
 
 ## 기능 (Features)
 

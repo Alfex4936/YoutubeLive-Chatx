@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
 public class KeywordRankingService {
 
     private static final int MAX_KEYWORDS = 200; // Configurable maximum ranking size
-    // Expiration time for each video's keyword ranking key, e.g., 60 minutes
-    private static final long EXPIRATION_MINUTES = 60L;
+    // Expiration time for each video's keyword ranking key, e.g., minutes
+    private static final long EXPIRATION_MINUTES = 120L;
 
 
     private final RedisTemplate<String, String> redisTemplate;

@@ -11,6 +11,7 @@ import csw.youtube.chat.live.js.YouTubeChatScriptProvider;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.playwright.PlaywrightBrowserManager;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -19,12 +20,13 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -91,10 +93,17 @@ public class YTChatScraperService {
 //        this.playwrightWorkerPool = playwrightWorkerPool;
     }
 
+    @PostConstruct
+    public void cleanupOrphanProcesses() {
+        log.info("Checking for orphaned Rust scraper processes...");
+        cleanupOrphanedChromeProcesses();
+    }
+
     @PreDestroy
     public void onDestroy() {
         // Stop all active scrapers so they don’t queue new tasks
         activeFutures.keySet().forEach(this::stopScraper);
+        activeScrapers.keySet().forEach(this::stopRustScraper);
     }
 
     /**
@@ -593,4 +602,138 @@ public class YTChatScraperService {
             }
         }
     }
+
+    private final String RUST_SCRAPER_PATH = "src/main/resources/ytchatx-scraper.exe"; // Rust binary path
+    private final Map<String, Process> activeScrapers = new ConcurrentHashMap<>();
+    private final ExecutorService processExecutor = Executors.newCachedThreadPool(); // Handles process execution
+    /**
+     * Starts the Rust scraper binary for a given videoId.
+     */
+    public boolean startRustScraper(String videoId, Set<Language> skipLangs) {
+        // Avoid starting duplicate scrapers
+        if (activeScrapers.containsKey(videoId)) {
+            log.warn("Scraper already running for video {}. Ignoring new request.", videoId);
+            return false;
+        }
+
+        try {
+            List<String> command = buildCommand(videoId, skipLangs);
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+
+            // Redirect logs to avoid blocking Java process
+            processBuilder.redirectErrorStream(true);
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT); // Print logs to Java output OR use file
+
+            Process process = processBuilder.start();
+            activeScrapers.put(videoId, process);
+
+            // Fully detach process (prevents blocking the Java app)
+            processExecutor.submit(() -> {
+                try {
+                    process.waitFor(); // This runs in a separate thread, so it doesn't block Java
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    activeScrapers.remove(videoId);
+                }
+            });
+
+            log.info("Scraper started for video: {}", videoId);
+            return true;
+        } catch (IOException e) {
+            log.error("Failed to start scraper for video {}", videoId, e);
+            return false;
+        }
+    }
+
+
+    private List<String> buildCommand(String videoId, Set<Language> skipLangs) {
+        List<String> command = new ArrayList<>();
+        command.add(RUST_SCRAPER_PATH);
+        command.add("--video-id=" + videoId);
+        if (!skipLangs.isEmpty()) {
+            String langs = String.join(",", skipLangs.stream().map(Enum::name).toList());
+            command.add("--skip-langs=" + langs);
+        }
+        return command;
+    }
+
+    private void captureProcessOutput(String videoId, Process process) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                log.info("[Scraper {}] {}", videoId, line);
+            }
+        } catch (IOException e) {
+            log.error("Error capturing process output for video {}", videoId, e);
+        } finally {
+            activeScrapers.remove(videoId);
+            log.info("Scraper process for video {} has exited.", videoId);
+        }
+    }
+
+    /**
+     * Stops the Rust scraper process for the given video ID.
+     * Ensures that no orphan processes are left running.
+     *
+     * @param videoId The YouTube video ID to stop scraping.
+     * @return A message indicating the status of the stop operation.
+     */
+    public String stopRustScraper(String videoId) {
+        Process process = activeScrapers.remove(videoId);
+
+        if (process == null) {
+            return "No active scraper found for video ID: " + videoId;
+        }
+
+        try {
+            // First, attempt graceful shutdown
+            process.destroy();
+            boolean exited = process.waitFor(15, TimeUnit.SECONDS); // Wait for up to 15 seconds
+
+            if (!exited) {
+                log.warn("Rust scraper did not terminate, forcing shutdown...");
+                process.destroyForcibly(); // Force kill process
+                process.waitFor(15, TimeUnit.SECONDS); // Give it 15 more seconds to exit
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly(); // Ensure it gets stopped
+        }
+
+        // 🔥 Kill any orphaned Chrome processes
+        cleanupOrphanedChromeProcesses();
+
+        // Ensure the process is fully terminated
+        if (process.isAlive()) {
+            log.error("Rust process for video {} is still running! Manual intervention required.", videoId);
+        }
+
+        // Update scraper state
+        ScraperState state = scraperStates.get(videoId);
+        if (state != null) {
+            state.setStatus(ScraperState.Status.COMPLETED);
+            state.setErrorMessage("Stopped by user.");
+        }
+
+        log.info("Scraper stopped for video ID: {}", videoId);
+        return "Scraper stopped for video ID: " + videoId;
+    }
+
+
+    private void cleanupOrphanedChromeProcesses() {
+        log.info("Cleaning up any orphaned Chrome processes...");
+
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                new ProcessBuilder("taskkill", "/F", "/IM", "ytchatx-scraper.exe").start();
+            } else {
+                new ProcessBuilder("pkill", "-f", "ytchatx-scraper").start();
+            }
+            log.info("Orphaned Chrome processes killed.");
+        } catch (IOException e) {
+            log.error("Failed to clean up orphaned Chrome processes.", e);
+        }
+    }
+
 }
