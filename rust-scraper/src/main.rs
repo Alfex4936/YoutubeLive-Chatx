@@ -2,23 +2,27 @@
 use anyhow::{Context, Result};
 
 use chromiumoxide::cdp::browser_protocol::system_info::ProcessInfo;
-use chromiumoxide::{detection::{default_executable, DetectionOptions}, handler::viewport::Viewport, Browser, BrowserConfig, Element, Page};
+use chromiumoxide::{
+    Browser, BrowserConfig, Element, Page,
+    detection::{DetectionOptions, default_executable},
+    handler::viewport::Viewport,
+};
 use chrono::Utc;
 use clap::Parser;
 use futures::StreamExt;
 use reqwest::Client;
 use serde_json::json;
+use std::mem;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
-use std::mem;
 use sysinfo::{MINIMUM_CPU_UPDATE_INTERVAL, Pid, ProcessesToUpdate, System, get_current_pid};
+use tempfile::tempdir;
 use tokio::{
     sync::Mutex,
-    time::{sleep, Duration, Instant},
+    time::{Duration, Instant, sleep},
 };
-use tempfile::tempdir;
 
 mod js_scripts;
 
@@ -28,7 +32,7 @@ struct ChatMessage {
     message: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum ScraperStatus {
     Idle,
     Running,
@@ -68,11 +72,35 @@ async fn main() -> anyhow::Result<()> {
 
     eprintln!("💻 Starting scraper for video: {}", args.video_id);
 
+    let skip_langs: Vec<&str> = args
+        .skip_langs
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .collect();
+
     // First set to IDLE
-    send_metrics(&client, &args.video_id, &[], ScraperStatus::Idle, &created_at, None, None, 0, 0).await?;
+    send_metrics(
+        &client,
+        &args.video_id,
+        &skip_langs,
+        ScraperStatus::Idle,
+        &created_at,
+        None,
+        None,
+        0,
+        0,
+    )
+    .await?;
 
     // Run main logic
-    let scrape_result = scraper_main_logic(&args, &client, &created_at, Arc::clone(&total_messages), Arc::clone(&is_running)).await;
+    let scrape_result = scraper_main_logic(
+        &args,
+        &client,
+        &created_at,
+        Arc::clone(&total_messages),
+        Arc::clone(&is_running),
+    )
+    .await;
 
     if let Err(ref e) = scrape_result {
         eprintln!("❌ Scraper encountered an error");
@@ -81,19 +109,19 @@ async fn main() -> anyhow::Result<()> {
         let _ = send_metrics(
             &client,
             &args.video_id,
-            &args.skip_langs.split(',').collect::<Vec<_>>(),
+            &[],
             ScraperStatus::Failed,
             &created_at,
             None,
             None,
             0,
             total_messages.load(Ordering::SeqCst),
-        ).await;
+        )
+        .await;
     }
 
     Ok(())
 }
-
 
 async fn scraper_main_logic(
     args: &Args,
@@ -102,12 +130,6 @@ async fn scraper_main_logic(
     total_messages: Arc<AtomicUsize>,
     is_running: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
-    let skip_langs: Vec<&str> = args
-        .skip_langs
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .collect();
-
     let (mut browser, mut handler) = Browser::launch(config_browser()).await?;
     tokio::spawn(async move { while handler.next().await.is_some() {} });
 
@@ -122,8 +144,16 @@ async fn scraper_main_logic(
     #[cfg(debug_assertions)]
     println!("🔗 Found chat iframe URL: {}", iframe_url);
 
-    let video_title: String = page.evaluate(js_scripts::VIDEO_TITLE).await?.into_value().unwrap_or_default();
-    let channel_name: String = page.evaluate(js_scripts::CHANNEL_NAME).await?.into_value().unwrap_or_default();
+    let video_title: String = page
+        .evaluate(js_scripts::VIDEO_TITLE)
+        .await?
+        .into_value()
+        .unwrap_or_default();
+    let channel_name: String = page
+        .evaluate(js_scripts::CHANNEL_NAME)
+        .await?
+        .into_value()
+        .unwrap_or_default();
 
     page.close().await?;
     let iframe_page = browser.new_page(&iframe_url).await?;
@@ -131,21 +161,27 @@ async fn scraper_main_logic(
     setup_js_bindings(&iframe_page).await?;
 
     let message_batch = Arc::new(Mutex::new(Vec::new()));
-    tokio::spawn(handle_chat_events(iframe_page.clone(), Arc::clone(&message_batch)));
+    tokio::spawn(handle_chat_events(
+        iframe_page.clone(),
+        Arc::clone(&message_batch),
+    ));
 
     iframe_page.evaluate(js_scripts::CHAT_OBSERVER).await?;
 
     send_metrics(
         &client,
         &args.video_id,
-        &skip_langs,
+        &[],
         ScraperStatus::Running,
         &created_at,
         Some(&video_title),
         Some(&channel_name),
         0,
         0,
-    ).await?;
+    )
+    .await?;
+
+    eprintln!("initiated"); // for java
 
     // If there's no activity for 30 mins, it's probably over
     let inactivity_limit = Duration::from_secs(30 * 60); // 30 minutes
@@ -153,19 +189,27 @@ async fn scraper_main_logic(
     let mut last_message_time = Instant::now();
     let mut last_chat_check = Instant::now();
 
+    let max_retries = 3;
+
+    #[cfg(debug_assertions)]
     let mut sys = System::new_all();
     loop {
         if !is_running.load(Ordering::SeqCst) {
             break;
         }
+        let mut wait_duration = Duration::from_secs(1);
+        let mut retries = 0;
 
-        // Prepare the list of PIDs to update: always include the current process.
-        let current_pid = get_current_pid().expect("Failed to get current PID");
-        let pids = vec![current_pid];
-        sys.refresh_processes(ProcessesToUpdate::Some(&pids), true);
+        #[cfg(debug_assertions)]
+        {
+            // Prepare the list of PIDs to update: always include the current process.
+            let current_pid = get_current_pid().expect("Failed to get current PID");
+            let pids = vec![current_pid];
+            sys.refresh_processes(ProcessesToUpdate::Some(&pids), true);
 
-        // Log resource usage for the current Rust process.
-        log_rust_usage(&sys);
+            // Log resource usage for the current Rust process.
+            log_rust_usage(&sys);
+        }
 
         let mut batch = Vec::new(); // Pre-allocate empty batch
 
@@ -176,7 +220,7 @@ async fn scraper_main_logic(
 
         if !batch.is_empty() {
             last_message_time = Instant::now();
-            send_messages_to_backend(&client, &args.video_id, &batch).await?;
+            let _ = send_messages_to_backend(&client, &args.video_id, &batch).await.is_ok();
         }
         //  else if Instant::now().duration_since(last_message_time) >= inactivity_limit {
         //     #[cfg(debug_assertions)]
@@ -190,10 +234,10 @@ async fn scraper_main_logic(
         if !is_running.load(Ordering::SeqCst) {
             break;
         }
-        send_metrics(
+        let result = send_metrics(
             &client,
             &args.video_id,
-            &skip_langs,
+            &[],
             ScraperStatus::Running,
             &created_at,
             Some(&video_title),
@@ -201,12 +245,28 @@ async fn scraper_main_logic(
             interval_messages,
             total_messages.load(Ordering::SeqCst),
         )
-        .await?;
+        .await;
+
+        if let Err(e) = result {
+            retries += 1;
+            eprintln!("⚠️ send_metrics failed (attempt {}): {}", retries, e);
+        
+            if retries >= max_retries {
+                eprintln!("❌ Maximum retries reached, stopping scraper...");
+                is_running.store(false, Ordering::SeqCst);
+                break;
+            }
+        
+            sleep(wait_duration).await;
+            wait_duration *= 2; // Exponential backoff
+        }        
 
         let time_since_last_message = Instant::now().duration_since(last_message_time);
 
         // After 15 minutes of inactivity, check via HTTP request if chat is really dead
-        if time_since_last_message >= check_chat_deadline && Instant::now().duration_since(last_chat_check) >= Duration::from_secs(60) {
+        if time_since_last_message >= check_chat_deadline
+            && Instant::now().duration_since(last_chat_check) >= Duration::from_secs(60)
+        {
             if has_live_chat_ended(&client, &iframe_url).await? {
                 #[cfg(debug_assertions)]
                 println!("🔴 Live chat is unavailable (detected via HTTP request). Stopping.");
@@ -214,14 +274,13 @@ async fn scraper_main_logic(
             }
             last_chat_check = Instant::now();
         }
-    
+
         // If no activity for 30 minutes, exit without checking further
         if time_since_last_message >= inactivity_limit {
             #[cfg(debug_assertions)]
             println!("⏳ No messages for 30 minutes. Exiting.");
             break;
         }
-    
 
         sleep(Duration::from_secs(10)).await;
 
@@ -233,7 +292,7 @@ async fn scraper_main_logic(
     send_metrics(
         &client,
         &args.video_id,
-        &skip_langs,
+        &[],
         ScraperStatus::Completed,
         &created_at,
         Some(&video_title),
@@ -260,7 +319,7 @@ async fn handle_signals(is_running: Arc<AtomicBool>) {
 #[cfg(unix)]
 async fn wait_for_signal() {
     use tokio::io::{self, AsyncBufReadExt, BufReader};
-    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::signal::unix::{SignalKind, signal};
 
     let mut signal_terminate = signal(SignalKind::terminate()).unwrap();
     let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
@@ -279,7 +338,10 @@ async fn wait_for_signal() {
 
 #[cfg(windows)]
 async fn wait_for_signal() {
-    use tokio::{io::{self, AsyncBufReadExt, BufReader}, signal::windows};
+    use tokio::{
+        io::{self, AsyncBufReadExt, BufReader},
+        signal::windows,
+    };
 
     let mut signal_c = windows::ctrl_c().unwrap();
     let mut signal_break = windows::ctrl_break().unwrap();
@@ -311,22 +373,36 @@ async fn send_metrics(
     messages_in_last_interval: usize,
     total_messages: usize,
 ) -> Result<()> {
+    let mut body = json!({
+        "videoId": video_id,
+        "status": status.as_str(),
+        "createdAt": created_at,
+        "messagesInLastInterval": messages_in_last_interval,
+        "totalMessages": total_messages,
+    });
+
+    if status == ScraperStatus::Idle {
+        body["skipLangs"] = json!(skip_langs);
+    }
+
+    if status == ScraperStatus::Idle || status == ScraperStatus::Running {
+        if let Some(title) = video_title {
+            body["videoTitle"] = json!(title);
+        }
+        if let Some(channel) = channel_name {
+            body["channelName"] = json!(channel);
+        }
+    }
+
     client
-        .post("http://localhost:8080/scrapers/updateMetrics")
-        .json(&json!({
-            "videoTitle": video_title,
-            "channelName": channel_name,
-            "videoId": video_id,
-            "skipLangs": skip_langs,
-            "status": status.as_str(),
-            "createdAt": created_at,
-            "messagesInLastInterval": messages_in_last_interval,
-            "totalMessages": total_messages,
-        }))
+        .patch("http://localhost:8080/scrapers/updateMetrics")
+        .json(&body)
         .send()
         .await?;
+
     Ok(())
 }
+
 
 async fn send_messages_to_backend(
     client: &Client,
@@ -349,10 +425,18 @@ fn config_browser() -> BrowserConfig {
 
     BrowserConfig::builder()
         .no_sandbox()
-        .chrome_executable(default_executable(DetectionOptions{msedge: false, unstable: true}).unwrap())
+        .chrome_executable(
+            default_executable(DetectionOptions {
+                msedge: false,
+                unstable: true,
+            })
+            .unwrap(),
+        )
         // .disable_cache()
         .headless_mode(chromiumoxide::browser::HeadlessMode::True)
         .args([
+            "--single-process",
+            "--no-zygote",
             "--no-startup-window",
             "--remote-debugging-port=0",
             "--disable-popup-blocking",
