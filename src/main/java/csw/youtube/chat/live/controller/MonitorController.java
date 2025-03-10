@@ -1,7 +1,7 @@
 package csw.youtube.chat.live.controller;
 
 import csw.youtube.chat.live.model.ScraperState;
-import csw.youtube.chat.live.service.YTChatScraperService;
+import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.Map;
 
-@Controller  // ✅ This makes it return an HTML page instead of JSON
+@Controller
 @RequiredArgsConstructor
 public class MonitorController {
 
-    private final YTChatScraperService scraperService;
+    private final YTRustScraperService scraperService;
 
     @GetMapping("/scraper-monitor")
     public String getScraperMonitor(Model model,

@@ -5,7 +5,7 @@ import csw.youtube.chat.live.dto.MessagesRequest;
 import csw.youtube.chat.live.dto.MetricsUpdateRequest;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.RankingService;
-import csw.youtube.chat.live.service.YTChatScraperService;
+import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.HttpHeaders;
@@ -15,9 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
@@ -27,25 +25,20 @@ import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 @RequestMapping("/scrapers")
 public class ScraperController {
 
-    private final YTChatScraperService scraperService;
+    private final YTRustScraperService scraperService;
     private final RankingService rankingService;
 
-    @PostMapping("/updateMetrics")
+    @PatchMapping("/updateMetrics")
     public ResponseEntity<Void> updateMetrics(@RequestBody MetricsUpdateRequest request) {
         ScraperState state = scraperService.getScraperStates()
                 .computeIfAbsent(request.videoId(), ScraperState::new);
 
-        List<String> limitedSkipLangs = request.skipLangs().subList(0, Math.min(5, request.skipLangs().size()));
-        Set<Language> skipLangs = parseLanguages(limitedSkipLangs);
-        int lastThroughput = request.messagesInLastInterval();
+        ScraperState.Status newStatus = ScraperState.Status.valueOf(request.status());
+        state.setStatus(newStatus);
 
+        int lastThroughput = request.messagesInLastInterval();
         state.setLastThroughput(lastThroughput);
         state.getTotalMessages().addAndGet(lastThroughput);
-        state.setCreatedAt(request.createdAt());
-        state.setVideoTitle(request.videoTitle());
-        state.setChannelName(request.channelName());
-        state.setSkipLangs(skipLangs);
-
         long intervals = state.getIntervalsCount().incrementAndGet();
         double newAvg = intervals == 1
                 ? lastThroughput
@@ -53,7 +46,26 @@ public class ScraperController {
 
         state.setAverageThroughput(newAvg);
         state.setMaxThroughput(Math.max(lastThroughput, state.getMaxThroughput()));
-        state.setStatus(ScraperState.Status.valueOf(request.status()));
+
+        if (newStatus == ScraperState.Status.IDLE && request.skipLangs() != null) {
+            Set<Language> skipLangs = parseLanguages(
+                    request.skipLangs().subList(0, Math.min(5, request.skipLangs().size()))
+            );
+            state.setSkipLangs(skipLangs);
+        }
+
+        // TODO what if user updates video title
+        if ((newStatus == ScraperState.Status.IDLE || newStatus == ScraperState.Status.RUNNING)) {
+            if (request.videoTitle() != null) {
+                state.setVideoTitle(request.videoTitle());
+            }
+            if (request.channelName() != null) {
+                state.setChannelName(request.channelName());
+            }
+        }
+        if (request.createdAt() != null) {
+            state.setCreatedAt(request.createdAt());
+        }
 
         return ResponseEntity.ok().build();
     }
@@ -64,104 +76,6 @@ public class ScraperController {
         return ResponseEntity.ok().build();
     }
 
-
-    @PostMapping("/{videoId}/start")
-    public ResponseEntity<Map<String, String>> startScraper(
-            @PathVariable String videoId,
-            @RequestParam(required = false) List<String> langs // e.g. ["ENGLISH","SPANISH","FRENCH"]
-    ) {
-        // Keep max 5
-        if (langs != null && langs.size() > 5) {
-            langs = langs.subList(0, 5);
-        }
-        // Convert to a skip-set of Language
-        Set<Language> skipLangs = parseLanguages(langs);
-        ScraperState state = scraperService.getScraperState(videoId);
-        if (state != null && state.getStatus() == ScraperState.Status.RUNNING) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "Scraper already running", "status", "RUNNING"));
-        }
-
-        scraperService.scrapeChannel(videoId, skipLangs);
-        return ResponseEntity.ok(Map.of("message", "Scraper started", "status", "STARTED"));
-    }
-
-    @GetMapping("/{videoId}/status")
-    public ResponseEntity<Map<String, Object>> getScraperStatus(@PathVariable String videoId) {
-        ScraperState state = scraperService.getScraperState(videoId);
-        if (state == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "Scraper not found", "status", "NOT_FOUND"));
-        }
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", state.getStatus());
-        response.put("totalMessages", state.getTotalMessages().get());
-        response.put("averageThroughput", state.getAverageThroughput());
-        response.put("errorMessage", state.getErrorMessage());  // Allows null values
-
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/{videoId}/stop")
-    public ResponseEntity<Map<String, String>> stopScraper(@PathVariable String videoId) {
-        String stopped = scraperService.stopScraper(videoId);
-        if (stopped.startsWith("Stopping")) {
-            return ResponseEntity.ok(Map.of("message", "Scraper stopped", "status", "COMPLETED"));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", "Scraper not running", "status", "NOT_FOUND"));
-        }
-    }
-
-    /**
-     * Starts the scraper for the given videoId.
-     * Example: GET /start-scraper?videoId=abcd1234
-     */
-    @GetMapping("/start-scraper1")
-    public ResponseEntity<Void> startScraper2(
-            @RequestParam String videoId,
-            @RequestParam(required = false) List<String> langs // e.g. ["ENGLISH","SPANISH","FRENCH"]
-    ) {
-        // Keep max 5
-        if (langs != null && langs.size() > 5) {
-            langs = langs.subList(0, 5);
-        }
-        // Convert to a skip-set of Language
-        Set<Language> skipLangs = parseLanguages(langs);
-
-        if (videoId.startsWith("http")) {
-            videoId = videoId.replace(YTChatScraperService.YOUTUBE_WATCH_URL, "");
-        }
-
-        scraperService.scrapeChannel(videoId, skipLangs);
-//        scraperService.scrapeChannelPool(videoId, skipLangs);
-        String encodedMsg = URLEncoder.encode("Scraper started for video " + videoId, StandardCharsets.UTF_8);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Location", "/scraper-monitor?message=" + encodedMsg);
-        return new ResponseEntity<>(headers, HttpStatus.FOUND);  // 302 redirect
-    }
-
-
-    /**
-     * Stops the scraper for the given videoId if active.
-     * Example: GET /stop-scraper?videoId=test-channel
-     */
-    @GetMapping("/stop-scraper1")
-    public ResponseEntity<Void> stopScraper2(@RequestParam String videoId) {
-        String result = scraperService.stopScraper(videoId);
-
-        // Encode the message to be URL-safe
-        String encodedMsg = URLEncoder.encode(result, StandardCharsets.UTF_8);
-
-        // Set the Location header for redirection
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Location", "/scraper-monitor?message=" + encodedMsg);
-
-        // Return HTTP 302 (FOUND) Redirect Response
-        return new ResponseEntity<>(headers, HttpStatus.FOUND);
-    }
 
     @GetMapping("/stop-scraper")
     public ResponseEntity<Void> stopRustScraper(@RequestParam String videoId) {
@@ -180,27 +94,23 @@ public class ScraperController {
 
     @GetMapping("/start-scraper")
     public ResponseEntity<Void> startScraper3(@RequestParam String videoId,
-                                             @RequestParam(required = false) List<String> langs) {
+                                              @RequestParam(required = false) List<String> langs) {
         // Keep max 5 languages
-        if (langs != null && langs.size() > 5) {
-            langs = langs.subList(0, 5);
+        if (langs != null) {
+            langs = langs.subList(0, Math.min(5, langs.size()));
         }
         Set<Language> skipLangs = parseLanguages(langs);
 
         if (videoId.startsWith("http")) {
-            videoId = videoId.replace(YTChatScraperService.YOUTUBE_WATCH_URL, "");
+            videoId = videoId.replace(YTRustScraperService.YOUTUBE_WATCH_URL, "");
         }
 
-        boolean started = scraperService.startRustScraper(videoId, skipLangs);
+        boolean queued = scraperService.startRustScraper(videoId, skipLangs);
+        String message = queued ? "Scraper queued for video " + videoId : "Scraper already running/queued for video " + videoId;
 
-        if (!started) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(null); // 409 if already running
-        }
-
-        String encodedMsg = URLEncoder.encode("Scraper started for video " + videoId, StandardCharsets.UTF_8);
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Location", "/scraper-monitor?message=" + encodedMsg);
-        return new ResponseEntity<>(headers, HttpStatus.FOUND); // 302 redirect
+        headers.add("Location", "/scraper-monitor?message=" + URLEncoder.encode(message, StandardCharsets.UTF_8));
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 
 

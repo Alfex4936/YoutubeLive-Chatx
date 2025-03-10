@@ -5,7 +5,7 @@ import com.sun.management.OperatingSystemMXBean;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.RankingService;
-import csw.youtube.chat.live.service.YTChatScraperService;
+import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
@@ -22,7 +22,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ScraperStatsEndpoint {
 
-    private final YTChatScraperService ytChatScraperService;
+    private final YTRustScraperService ytRustScraperService;
     private final RankingService rankingService;
 
     @ReadOperation
@@ -41,7 +41,7 @@ public class ScraperStatsEndpoint {
 
         // read everything into a list so we can custom-sort
         List<Map.Entry<String, ScraperMetrics>> statsList = new ArrayList<>();
-        for (Map.Entry<String, ScraperState> entry : ytChatScraperService.getScraperStates().entrySet()) {
+        for (Map.Entry<String, ScraperState> entry : ytRustScraperService.getScraperStates().entrySet()) {
             String videoId = entry.getKey();
             ScraperState state = entry.getValue();
 
@@ -84,27 +84,34 @@ public class ScraperStatsEndpoint {
         }
 
         // Now sort the list with a custom comparator:
-        // 1) place FAILED at the bottom
+        // 1) place COMPLETED/FAILED at the bottom
         // 2) then compare averageThroughput descending
         // 3) then compare totalMessages descending
         statsList.sort((e1, e2) -> {
             ScraperMetrics m1 = e1.getValue();
             ScraperMetrics m2 = e2.getValue();
 
+            String status1 = String.valueOf(m1.status()).toUpperCase();
+            String status2 = String.valueOf(m2.status()).toUpperCase();
+
+            boolean m1Failed = "FAILED".equals(status1);
+            boolean m2Failed = "FAILED".equals(status2);
+            boolean m1Completed = "COMPLETED".equals(status1);
+            boolean m2Completed = "COMPLETED".equals(status2);
+
             // Push "FAILED" to the bottom
-            boolean m1Failed = "FAILED".equalsIgnoreCase(String.valueOf(m1.status()));
-            boolean m2Failed = "FAILED".equalsIgnoreCase(String.valueOf(m2.status()));
-            if (m1Failed && !m2Failed) {
-                return 1; // m1 goes after m2
-            } else if (!m1Failed && m2Failed) {
-                return -1; // m1 goes before m2
-            }
-            // If both are (or aren't) FAILED, compare averageThroughput descending
+            if (m1Failed && !m2Failed) return 1;
+            if (!m1Failed && m2Failed) return -1;
+
+            // Push "COMPLETED" below everything except "FAILED"
+            if (m1Completed && !m2Completed) return 1;
+            if (!m1Completed && m2Completed) return -1;
+
+            // If statuses are equal or neither is COMPLETED/FAILED, sort by averageThroughput (descending)
             int cmpAvg = Double.compare(m2.averageThroughput(), m1.averageThroughput());
-            if (cmpAvg != 0) {
-                return cmpAvg;
-            }
-            // If averageThroughput is the same, compare totalMessages descending
+            if (cmpAvg != 0) return cmpAvg;
+
+            // If averageThroughput is the same, compare totalMessages (descending)
             return Long.compare(m2.totalMessages(), m1.totalMessages());
         });
 

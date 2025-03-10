@@ -19,13 +19,13 @@ def parse_viewer_count(text):
 
 
 def get_live_video_ids():
-    """Scrape YouTube Live for active video IDs."""
+    """Scrape YouTube Live for active video IDs and sort them by viewer count."""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto("https://www.youtube.com/live?app=desktop", timeout=60000)
 
-        video_ids = set()
+        video_data = []  # Store tuples of (video_id, viewer_count)
         total_viewers = 0
         elements = page.locator('ytd-rich-grid-media').all()
 
@@ -35,16 +35,22 @@ def get_live_video_ids():
                 if link and "/live/" in link:
                     video_id = link.split("/live/")[-1]
                     video_id = re.sub(r"\?.*$", "", video_id)  # Remove query parameters
-                    video_ids.add(video_id)
 
-                # Extract viewer count
-                viewer_text = element.locator("span.inline-metadata-item").inner_text()
-                viewer_count = parse_viewer_count(viewer_text) if viewer_text else 0
-                total_viewers += viewer_count
+                    # Extract viewer count
+                    viewer_text = element.locator("span.inline-metadata-item").inner_text()
+                    viewer_count = parse_viewer_count(viewer_text) if viewer_text else 0
+                    total_viewers += viewer_count
+
+                    video_data.append((video_id, viewer_count))
 
         browser.close()
+
+        # Sort videos by viewer count in descending order
+        sorted_video_data = sorted(video_data, key=lambda x: x[1], reverse=True)
+        sorted_video_ids = [video_id for video_id, _ in sorted_video_data]
+
         print(f"Total Viewers Watching Live: {total_viewers:,}")
-        return list(video_ids)
+        return sorted_video_ids[:10]  # Return top 10 videos
 
 
 class ScraperUser(HttpUser):

@@ -39,4 +39,4 @@ out/
 application-secret.yml
 badwords.txt
 
-__pycache__
+!**/__pycache__

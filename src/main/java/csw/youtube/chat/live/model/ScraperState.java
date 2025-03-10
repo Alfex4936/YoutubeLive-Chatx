@@ -1,7 +1,7 @@
 package csw.youtube.chat.live.model;
 
 import com.github.pemistahl.lingua.api.Language;
-import csw.youtube.chat.live.service.YTChatScraperService;
+import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -37,12 +37,20 @@ public class ScraperState {
     public ScraperState(String videoId) {
         this.videoId = videoId;
     }
+    public ScraperState(String videoId, Set<Language> skipLangs) {
+        this.videoId = videoId;
+        this.skipLangs = skipLangs;
+    }
 
     public String getVideoUrl() {
-        return YTChatScraperService.YOUTUBE_WATCH_URL + videoId;
+        return YTRustScraperService.YOUTUBE_WATCH_URL + videoId;
     }
 
     public enum Status {
-        IDLE, RUNNING, FAILED, COMPLETED
+        QUEUED, IDLE, RUNNING, FAILED, COMPLETED
+    }
+
+    public boolean isActiveOrDead() {
+        return this.status == Status.RUNNING || this.status == Status.COMPLETED || this.status == Status.FAILED;
     }
 }
