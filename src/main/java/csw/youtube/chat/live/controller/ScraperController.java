@@ -15,11 +15,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
+@CrossOrigin("http://localhost:3001")
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/scrapers")
@@ -93,9 +96,8 @@ public class ScraperController {
     }
 
     @GetMapping("/start-scraper")
-    public ResponseEntity<Void> startScraper3(@RequestParam String videoId,
-                                              @RequestParam(required = false) List<String> langs) {
-        // Keep max 5 languages
+    public ResponseEntity<Map<String, String>> startScraper3(@RequestParam String videoId,
+                                                             @RequestParam(required = false) List<String> langs) {
         if (langs != null) {
             langs = langs.subList(0, Math.min(5, langs.size()));
         }
@@ -108,9 +110,11 @@ public class ScraperController {
         boolean queued = scraperService.startRustScraper(videoId, skipLangs);
         String message = queued ? "Scraper queued for video " + videoId : "Scraper already running/queued for video " + videoId;
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Location", "/scraper-monitor?message=" + URLEncoder.encode(message, StandardCharsets.UTF_8));
-        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+        // Return JSON instead of 302 redirect
+        Map<String, String> response = new HashMap<>();
+        response.put("message", message);
+
+        return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
     }
 
 
