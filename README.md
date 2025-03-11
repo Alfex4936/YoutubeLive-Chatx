@@ -1,10 +1,10 @@
 # YTChatX
 
-![frontend_demo](https://github.com/user-attachments/assets/8727b852-0263-4a5c-a6f1-605f4ee86cba)
+![frontend_demo3-1](https://github.com/user-attachments/assets/5a7957fb-c1e8-404b-92be-fc68119d5196)
 
-![simple](https://github.com/user-attachments/assets/b3cf0545-ae8e-4387-98b3-b9d67948b16b)
+![simple-ui](https://github.com/user-attachments/assets/dea4e7ab-817e-4c5b-8c7f-90485f33639e)
 
-YouTube Live 채팅을 API 없이 **실시간**으로 읽어오는 프로젝트
+YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로젝트
 
 *Work in Progress...*
 
@@ -24,6 +24,9 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어오는 프로젝트
   실시간 데이터 전송
 - **Rust lang**  
   간단한 Scraper 작업 프로세스 분리
+- **ReactJS**
+  간단한 Frontend
+
 
 ## 기능 (Features)
 
