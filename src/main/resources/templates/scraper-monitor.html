@@ -167,7 +167,7 @@
                 <!-- Show "Stop" only if RUNNING -->
                 <!--/*@thymesVar id="ScraperState"*/-->
                 <a th:if="${entry.value.status.name()} == 'RUNNING'"
-                   th:href="@{/scrapers/stop-scraper(videoId=${entry.key})}"
+                   th:href="@{/scrapers/stop(videoId=${entry.key})}"
                    class="btn-link">Stop</a>
             </td>
         </tr>
@@ -176,7 +176,7 @@
 
     <hr/>
     <h2>Start a New Scraper</h2>
-    <form th:action="@{/scrapers/start-scraper}" method="get">
+    <form th:action="@{/scrapers/start}" method="get">
         <label for="videoId">Video ID or URL:</label>
         <input type="text" id="videoId" name="videoId" placeholder="jfKfPfyJRdk" value="jfKfPfyJRdk"/>
 

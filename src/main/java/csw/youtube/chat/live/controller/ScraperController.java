@@ -1,12 +1,15 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
+import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.dto.MessagesRequest;
 import csw.youtube.chat.live.dto.MetricsUpdateRequest;
+import csw.youtube.chat.live.dto.ScraperMetrics;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.actuate.endpoint.annotation.Selector;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -15,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +27,6 @@ import java.util.Set;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
-@CrossOrigin("http://localhost:3001")
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/scrapers")
@@ -80,23 +84,22 @@ public class ScraperController {
     }
 
 
-    @GetMapping("/stop-scraper")
-    public ResponseEntity<Void> stopRustScraper(@RequestParam String videoId) {
+    @GetMapping("/stop")
+    public ResponseEntity<Map<String, String>> stopRustScraper(@RequestParam String videoId) {
         String result = scraperService.stopRustScraper(videoId);
 
         // Encode the message to be URL-safe
-        String encodedMsg = URLEncoder.encode(result, StandardCharsets.UTF_8);
+        // String encodedMsg = URLEncoder.encode(result, StandardCharsets.UTF_8);
 
-        // Set the Location header for redirection
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Location", "/scraper-monitor?message=" + encodedMsg);
+        // Return JSON instead of 302 redirect
+        Map<String, String> response = new HashMap<>();
+        response.put("message", result);
 
-        // Return HTTP 302 (FOUND) Redirect Response
-        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+        return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
     }
 
-    @GetMapping("/start-scraper")
-    public ResponseEntity<Map<String, String>> startScraper3(@RequestParam String videoId,
+    @GetMapping("/start")
+    public ResponseEntity<Map<String, String>> startScraper(@RequestParam String videoId,
                                                              @RequestParam(required = false) List<String> langs) {
         if (langs != null) {
             langs = langs.subList(0, Math.min(5, langs.size()));
@@ -121,5 +124,45 @@ public class ScraperController {
     @GetMapping("/keyword-ranking")
     public java.util.Set<ZSetOperations.TypedTuple<String>> getKeywords(@RequestParam String videoId, @RequestParam int k) {
         return rankingService.getTopKeywords(videoId, k);
+    }
+
+    @GetMapping("/statistics")
+    public ResponseEntity<ScraperMetrics> getScraperStat(@RequestParam String videoId) {
+        ScraperState state = scraperService.getScraperState(videoId);
+
+        if (state == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Double> topLanguages = rankingService.getTopLanguages(videoId, 3);
+        List<KeywordRankingPair> topKeywordsWithScores = rankingService.getTopKeywordStrings(videoId, 5);
+
+        long runningTimeMinutes = 0;
+        if (state.getStatus().name().equals("RUNNING")) {
+            Instant createdAt = state.getCreatedAt();
+            if (createdAt != null) {
+                runningTimeMinutes = Duration.between(createdAt, Instant.now()).toMinutes();
+            }
+        }
+
+        ScraperMetrics metrics = new ScraperMetrics(
+                state.getVideoTitle(),
+                state.getChannelName(),
+                state.getVideoUrl(),
+                state.getStatus(),
+                runningTimeMinutes,
+                state.getSkipLangs(),
+                state.getLastThroughput(),
+                state.getMaxThroughput(),
+                state.getAverageThroughput(),
+                state.getTotalMessages().get(),
+                topKeywordsWithScores,
+                topLanguages,
+                state.getThreadName(),
+                state.getCreatedAt(),
+                state.getErrorMessage()
+        );
+
+        return ResponseEntity.ok(metrics);
     }
 }

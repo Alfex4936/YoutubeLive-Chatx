@@ -176,7 +176,7 @@ public class YTRustScraperService {
             log.error("Error capturing output for {}", videoId, e);
             updateScraperStatusToFailed(videoId, "Communication with Rust scraper failed.");
         } finally {
-            log.info("Scraper process for video {} has exited.", videoId);
+            // log.info("Scraper process for video {} has exited.", videoId);
         }
     }
 

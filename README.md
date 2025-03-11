@@ -1,5 +1,7 @@
 # YTChatX
 
+![frontend_demo](https://github.com/user-attachments/assets/8727b852-0263-4a5c-a6f1-605f4ee86cba)
+
 ![simple](https://github.com/user-attachments/assets/b3cf0545-ae8e-4387-98b3-b9d67948b16b)
 
 YouTube Live 채팅을 API 없이 **실시간**으로 읽어오는 프로젝트
@@ -36,7 +38,7 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어오는 프로젝트
   - [ ] 가장 많이 채팅한 사용자
   - [ ] 고유 사용자 수 집계
   - [ ] 그래프 저장 (지난 방송과 비교, 채팅 트렌드 비교)
-  - [ ] 감정 분석 (긍정 / 부정 / 중립)
+  - [ ] 감정 분석 (긍정 / 부정 / 중립) - local llama3-8b?
   - [ ] 최근 채팅 AI 요약
 - [ ] 소셜 로그인 (OAuth2)
 

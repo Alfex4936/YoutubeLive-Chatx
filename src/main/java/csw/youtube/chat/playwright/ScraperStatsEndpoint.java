@@ -1,8 +1,8 @@
 package csw.youtube.chat.playwright;
 
-import com.github.pemistahl.lingua.api.Language;
 import com.sun.management.OperatingSystemMXBean;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
+import csw.youtube.chat.live.dto.ScraperMetrics;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTRustScraperService;
@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.lang.management.ManagementFactory;
 import java.time.Duration;
@@ -132,25 +131,4 @@ public class ScraperStatsEndpoint {
         return response;
     }
 
-    /**
-     * Represents the metrics we want to expose for each video ID.
-     */
-    public record ScraperMetrics(
-            String videoTitle,
-            String channelName,
-            String videoUrl,
-            ScraperState.Status status,
-            long runningTimeMinutes, // minutes
-            Set<Language> skipLangs,
-            int lastThroughput,
-            int maxThroughput,
-            double averageThroughput,
-            long totalMessages,
-            List<KeywordRankingPair> topKeywords,
-            Map<String, Double> topLanguages,
-            String threadName,
-            Instant createdAt,
-            String errorMessage
-    ) {
-    }
 }
