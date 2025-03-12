@@ -1,11 +1,14 @@
 package csw.youtube.chat.live.model;
 
 import com.github.pemistahl.lingua.api.Language;
+import csw.youtube.chat.live.dto.TopChatter;
 import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,6 +24,8 @@ public class ScraperState {
     private String videoTitle;
     private String channelName;
     private Instant createdAt;
+    private List<TopChatter> topChatters = new ArrayList<>();
+
     // Counts all messages since scraper started
     private AtomicLong totalMessages = new AtomicLong(0);
     //  Throughput metrics

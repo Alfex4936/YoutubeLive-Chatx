@@ -1,6 +1,7 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
+import csw.youtube.chat.common.annotation.ApiV1;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.dto.MessagesRequest;
 import csw.youtube.chat.live.dto.MetricsUpdateRequest;
@@ -9,15 +10,10 @@ import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.actuate.endpoint.annotation.Selector;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -53,6 +49,11 @@ public class ScraperController {
 
         state.setAverageThroughput(newAvg);
         state.setMaxThroughput(Math.max(lastThroughput, state.getMaxThroughput()));
+
+        // Store top chatters if provided
+        if (request.topChatters() != null && !request.topChatters().isEmpty()) {
+            state.setTopChatters(request.topChatters());
+        }
 
         if (newStatus == ScraperState.Status.IDLE && request.skipLangs() != null) {
             Set<Language> skipLangs = parseLanguages(
@@ -100,7 +101,7 @@ public class ScraperController {
 
     @GetMapping("/start")
     public ResponseEntity<Map<String, String>> startScraper(@RequestParam String videoId,
-                                                             @RequestParam(required = false) List<String> langs) {
+                                                            @RequestParam(required = false) List<String> langs) {
         if (langs != null) {
             langs = langs.subList(0, Math.min(5, langs.size()));
         }
@@ -152,6 +153,7 @@ public class ScraperController {
                 state.getStatus(),
                 runningTimeMinutes,
                 state.getSkipLangs(),
+                state.getTopChatters(),
                 state.getLastThroughput(),
                 state.getMaxThroughput(),
                 state.getAverageThroughput(),

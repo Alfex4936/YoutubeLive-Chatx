@@ -24,7 +24,7 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로
   실시간 데이터 전송
 - **Rust lang**  
   간단한 Scraper 작업 프로세스 분리
-- **ReactJS**
+- **ReactJS**  
   간단한 Frontend
 
 

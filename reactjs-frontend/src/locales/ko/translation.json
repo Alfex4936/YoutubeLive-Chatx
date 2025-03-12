@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "유튜브 라이브 채팅 분석기",
+    "history": "기록"
+  },
+  "controls": {
+    "title": "분석기 제어",
+    "videoInput": "유튜브 URL 또는 비디오 ID",
+    "videoPlaceholder": "예: https://www.youtube.com/watch?v=abc123",
+    "languageFilter": "언어 필터 (최대 5개)",
+    "noLanguagesSelected": "선택된 언어 없음",
+    "selectionsRemaining": "{{count}}개 선택 가능",
+    "startAnalyzer": "분석기 시작",
+    "starting": "시작 중...",
+    "stopAnalyzer": "분석기 중지",
+    "stopping": "중지 중..."
+  },
+  "stats": {
+    "title": "분석기 통계",
+    "videoInfo": "라이브 정보",
+    "vidTitle": "제목:",
+    "channel": "채널:",
+    "status": {
+      "running": "실행 중",
+      "stopped": "중지됨"
+    },
+    "performance": "성능 지표",
+    "runningTime": "실행 시간",
+    "minutes": "분",
+    "totalMessages": "총 메시지",
+    "throughput": {
+      "current": "현재 (10초)",
+      "average": "평균 (10초)",
+      "maximum": "최대 (10초)",
+      "lastInterval": "최근 10초 간격",
+      "allIntervals": "모든 10초 간격",
+      "peakInterval": "최대 10초 간격",
+      "unit": "메시지/초"
+    },
+    "started": "시작:",
+    "topKeywords": "주요 키워드 (최근)",
+    "filteredLanguages": "필터링된 언어",
+    "languageDistribution": "언어 분포"
+  },
+  "messages": {
+    "noData": "이 비디오에 대한 데이터가 아직 없습니다.",
+    "scraperStarted": "분석기가 시작되었습니다.",
+    "scraperStopped": "분석기가 중지되었습니다.",
+    "errorStarting": "분석기 시작 오류",
+    "errorStopping": "분석기 중지 오류"
+  },
+  "history": {
+    "title": "비디오 기록",
+    "noHistory": "기록이 없습니다",
+    "id": "ID:",
+    "youtube": "@유튜브",
+    "clearHistory": "기록 지우기",
+    "close": "닫기"
+  },
+  "languages": {
+    "ENGLISH": "영어",
+    "SPANISH": "스페인어",
+    "FRENCH": "프랑스어",
+    "GERMAN": "독일어",
+    "KOREAN": "한국어",
+    "ARABIC": "아랍어",
+    "NYNORSK": "뉘노르스크어",
+    "DANISH": "덴마크어",
+    "MAORI": "마오리어",
+    "DUTCH": "네덜란드어",
+    "PERSIAN": "페르시아어",
+    "ESTONIAN": "에스토니아어",
+    "POLISH": "폴란드어",
+    "TAGALOG": "타갈로그어",
+    "SWEDISH": "스웨덴어",
+    "SOMALI": "소말리아어",
+    "ALBANIAN": "알바니아어",
+    "AZERBAIJANI": "아제르바이잔어",
+    "URDU": "우르두어",
+    "RUSSIAN": "러시아어",
+    "CHINESE": "중국어"
+  }
+}

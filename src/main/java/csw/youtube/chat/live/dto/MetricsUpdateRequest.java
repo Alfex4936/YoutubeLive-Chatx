@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.Set;
 
 public record MetricsUpdateRequest(String videoTitle, String channelName, String videoId, Instant createdAt,
-                                   List<String> skipLangs, int messagesInLastInterval, String status ) {
+                                   List<String> skipLangs, int messagesInLastInterval, String status, List<TopChatter> topChatters) {
 }

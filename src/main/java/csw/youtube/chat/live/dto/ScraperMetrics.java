@@ -15,6 +15,7 @@ public record ScraperMetrics(
         ScraperState.Status status,
         long runningTimeMinutes, // minutes
         Set<Language> skipLangs,
+        List<TopChatter> topChatters,
         int lastThroughput,
         int maxThroughput,
         double averageThroughput,

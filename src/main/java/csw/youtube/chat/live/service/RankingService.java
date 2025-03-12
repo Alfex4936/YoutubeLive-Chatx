@@ -126,8 +126,23 @@ public class RankingService {
                 "더", "더욱", "아직", "이미", "정말", "저기", "여기", "그곳", "뭐"
         ));
 
+        // French stop words.
+        ignoreKeywords.addAll(List.of(
+                "les", "le", "la", "las", "des", "de", "pas", "est"
+        ));
+
         log.info("Total ignore keywords count: {}", ignoreKeywords.size());
     }
+
+    // TODO time filter?
+    /*
+    double timestamp = System.currentTimeMillis() / 1000.0; // Unix timestamp in seconds
+    redisTemplate.opsForZSet().add(key, keyword, timestamp);
+
+    long cutoff = (System.currentTimeMillis() / 1000) - (5 * 60); // Last 5 minutes
+    redisTemplate.opsForZSet().removeRangeByScore(key, 0, cutoff);
+    */
+
 
     /**
      * Processes a chat message to update keyword ranking for a video.

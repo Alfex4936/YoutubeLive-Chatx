@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "YouTube Live Chat Analyzer",
+    "history": "History"
+  },
+  "controls": {
+    "title": "Analyzer Controls",
+    "videoInput": "YouTube URL or Video ID",
+    "videoPlaceholder": "e.g., https://www.youtube.com/watch?v=abc123",
+    "languageFilter": "Filter Languages (max 5)",
+    "noLanguagesSelected": "No languages selected",
+    "selectionsRemaining": "{{count}} selections remaining",
+    "startAnalyzer": "Start Analyzer",
+    "starting": "Starting...",
+    "stopAnalyzer": "Stop Analyzer",
+    "stopping": "Stopping..."
+  },
+  "stats": {
+    "title": "Analyzer Stats",
+    "videoInfo": "Livestream Information",
+    "vidTitle": "Title:",
+    "channel": "Channel:",
+    "status": {
+      "running": "RUNNING",
+      "stopped": "STOPPED"
+    },
+    "performance": "Performance Metrics",
+    "runningTime": "Running Time",
+    "minutes": "min",
+    "totalMessages": "Total Messages",
+    "throughput": {
+      "current": "Current (10s)",
+      "average": "Average (10s)",
+      "maximum": "Maximum (10s)",
+      "lastInterval": "Last 10 second interval",
+      "allIntervals": "All 10s intervals",
+      "peakInterval": "Peak 10 second interval",
+      "unit": "msg/s"
+    },
+    "started": "Started:",
+    "topKeywords": "Top Keywords (Recent)",
+    "filteredLanguages": "Filtered Languages",
+    "languageDistribution": "Language Distribution"
+  },
+  "messages": {
+    "noData": "No data for this video yet.",
+    "AnalyzerStarted": "Analyzer started.",
+    "AnalyzerStopped": "Analyzer stopped.",
+    "errorStarting": "Error starting Analyzer",
+    "errorStopping": "Error stopping Analyzer"
+  },
+  "history": {
+    "title": "Video History",
+    "noHistory": "No history yet",
+    "id": "ID:",
+    "youtube": "@YouTube",
+    "clearHistory": "Clear History",
+    "close": "Close"
+  },
+  "languages": {
+    "ENGLISH": "English",
+    "SPANISH": "Spanish",
+    "FRENCH": "French",
+    "GERMAN": "German",
+    "KOREAN": "Korean",
+    "ARABIC": "Arabic",
+    "NYNORSK": "Nynorsk",
+    "DANISH": "Danish",
+    "MAORI": "Maori",
+    "DUTCH": "Dutch",
+    "PERSIAN": "Persian",
+    "ESTONIAN": "Estonian",
+    "POLISH": "Polish",
+    "TAGALOG": "Tagalog",
+    "SWEDISH": "Swedish",
+    "SOMALI": "Somali",
+    "ALBANIAN": "Albanian",
+    "AZERBAIJANI": "Azerbaijani",
+    "URDU": "Urdu",
+    "RUSSIAN": "Russian",
+    "CHINESE": "Chinese"
+  }
+}
