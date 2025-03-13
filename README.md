@@ -2,7 +2,16 @@
 
 ![frontend_demo3-1](https://github.com/user-attachments/assets/5a7957fb-c1e8-404b-92be-fc68119d5196)
 
-![simple-ui](https://github.com/user-attachments/assets/dea4e7ab-817e-4c5b-8c7f-90485f33639e)
+<table>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/335ea176-7745-41d9-b388-44a3d281b377" width="600"></td>
+    <td><img src="https://github.com/user-attachments/assets/c8c1d265-61e5-4459-a53e-bc0fe34385a1" width="600"></td>
+  </tr>
+  <tr>
+    <td>Korean</td>
+    <td>English</td>
+  </tr>
+</table>
 
 YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로젝트
 
@@ -38,9 +47,10 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로
   - 키워드 랭킹 (한국어일 경우 KOMORAN?)
   - 언어 감지 (특정 언어는 랭킹에서 제외)
   - 언어 통계 (top 3 언어 %)
-  - [ ] 가장 많이 채팅한 사용자
+  - 가장 많이 채팅한 사용자
   - [ ] 고유 사용자 수 집계
   - [ ] 그래프 저장 (지난 방송과 비교, 채팅 트렌드 비교)
+    - [x] 30분 동안 메시지 수 차트 그래프
   - [ ] 감정 분석 (긍정 / 부정 / 중립) - local llama3-8b?
   - [ ] 최근 채팅 AI 요약
 - [ ] 소셜 로그인 (OAuth2)

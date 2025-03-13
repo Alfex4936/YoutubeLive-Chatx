@@ -102,7 +102,7 @@ public class RankingService {
                 "what", "which", "who", "whom", "this", "that", "these", "those",
                 "am", "is", "are", "was", "were", "be", "been", "being",
                 "have", "has", "had", "having", "do", "does", "did", "doing",
-                "an", "the", "hi", "yo",
+                "an", "the", "hi", "yo", "i'm",
                 "and", "but", "if", "or", "because", "as", "until", "while",
                 "of", "at", "by", "for", "with", "about", "against", "between",
                 "into", "through", "during", "before", "after", "above", "below",

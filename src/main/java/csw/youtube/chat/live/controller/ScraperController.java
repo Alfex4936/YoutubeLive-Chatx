@@ -9,17 +9,30 @@ import csw.youtube.chat.live.dto.ScraperMetrics;
 import csw.youtube.chat.live.model.ScraperState;
 import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTRustScraperService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartUtils;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.DateAxis;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.title.TextTitle;
+import org.jfree.data.time.Second;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.awt.*;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
@@ -82,6 +95,74 @@ public class ScraperController {
     public ResponseEntity<Void> processMessages(@RequestBody MessagesRequest request) {
         scraperService.processChatMessages(request.videoId(), request.messages());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/messageGraph")
+    public void getMessageGraph(@RequestParam String videoId, HttpServletResponse response) throws IOException {
+        ScraperState state = scraperService.getScraperState(videoId);
+        if (state == null || !state.isActiveOrDead()) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        // Retrieve message count data
+        Map<Instant, Integer> messageCounts = scraperService.getMessageCounts(videoId);
+        TimeSeries series = new TimeSeries("Messages");
+
+        // Populate the time series dataset
+        for (Map.Entry<Instant, Integer> entry : messageCounts.entrySet()) {
+            series.addOrUpdate(new Second(Date.from(entry.getKey())), entry.getValue());
+        }
+        TimeSeriesCollection dataset = new TimeSeriesCollection(series);
+
+        // Create the chart
+        JFreeChart chart = ChartFactory.createTimeSeriesChart(
+                state.getVideoTitle(),
+                "Time",
+                "Message Count",
+                dataset,
+                false,  // Legend
+                true,   // Tooltips
+                false   // URLs
+        );
+
+        // Set a proper font for the title (avoid system fallback)
+        Font titleFont = new Font("SansSerif", Font.BOLD, 14);
+        chart.setTitle(new TextTitle(state.getVideoTitle(), titleFont));
+
+        // Subtitle for video URL
+        String videoUrl = scraperService.getScraperState(videoId).getVideoUrl();
+        TextTitle subtitle = new TextTitle(new SimpleDateFormat("MMMM dd, yyyy").format(Date.from(Instant.now())) + " | " + videoUrl, new Font("SansSerif", Font.ITALIC, 12));
+        chart.addSubtitle(subtitle);
+
+        // Apply custom styling
+        XYPlot plot = (XYPlot) chart.getPlot();
+        plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
+        plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
+        plot.setBackgroundPaint(new Color(240, 240, 240));  // Soft background
+
+        // Set time formatting
+        DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
+        domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss"));
+        domainAxis.setVerticalTickLabels(true); // Rotate for better readability
+
+        // Customize line rendering (thicker line + circular markers)
+        XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, true);
+        renderer.setSeriesPaint(0, Color.RED);
+        renderer.setSeriesStroke(0, new BasicStroke(2.0f));  // Thicker line
+        renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-3, -3, 6, 6)); // Circular markers
+        plot.setRenderer(renderer);
+
+        // Enable tooltips
+//        renderer.setDefaultToolTipGenerator((dataset, series, item) -> {
+//            Instant timestamp = messageCounts.keySet().toArray(new Instant[0])[item];
+//            int count = messageCounts.get(timestamp);
+//            return String.format("Time: %s\nMessages: %d\nWatch: %s", timestamp, count, scraperService.getScraperState(videoId).getVideoUrl());
+//        });
+
+        // Write the chart as PNG
+        response.setContentType("image/png");
+        ChartUtils.writeChartAsPNG(response.getOutputStream(), chart, 900, 700);
     }
 
 

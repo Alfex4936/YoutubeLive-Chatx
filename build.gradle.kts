@@ -57,6 +57,9 @@ dependencies {
 	implementation("org.apache.commons:commons-pool2:2.12.1")
 	implementation("com.github.pemistahl:lingua:1.2.2")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.3")
+	// https://mvnrepository.com/artifact/org.jfree/jfreechart
+	implementation("org.jfree:jfreechart:1.5.5")
+
 
 	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")

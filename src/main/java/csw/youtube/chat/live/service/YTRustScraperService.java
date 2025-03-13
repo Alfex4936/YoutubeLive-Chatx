@@ -14,6 +14,8 @@ import org.redisson.api.RBlockingQueue;
 import org.redisson.api.RSemaphore;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -51,16 +53,18 @@ public class YTRustScraperService {
     private final Map<String, Process> activeScrapers = new ConcurrentHashMap<>();
     private final RBlockingQueue<ScraperTask> scraperQueue;
     private final RSemaphore scraperSemaphore;
+    private final StringRedisTemplate redisTemplate;
 
     public YTRustScraperService(
             ProfanityLogService profanityLogService,
             RankingService rankingService,
             @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
-            RedissonClient redissonClient) {
+            RedissonClient redissonClient, StringRedisTemplate redisTemplate) {
         this.profanityLogService = profanityLogService;
         this.rankingService = rankingService;
         this.chatScraperExecutor = chatScraperExecutor;
         this.scraperQueue = redissonClient.getBlockingQueue("scraperQueue");
+        this.redisTemplate = redisTemplate;
         this.scraperQueue.clear();
 
         this.scraperSemaphore = redissonClient.getSemaphore("scraperSemaphore");
@@ -106,6 +110,26 @@ public class YTRustScraperService {
     // Core Functionality
 
     public void processChatMessages(String videoId, List<SimpleChatMessage> messages) {
+        chatScraperExecutor.execute(() -> {
+            int messageCount = messages.size();
+            long now = System.currentTimeMillis();
+
+            String key = "video:" + videoId + ":messageCounts";
+
+            // Store the "count" as the value and "now" as the score
+            redisTemplate.opsForZSet().add(key, String.valueOf(messageCount), now);
+
+            // Set expiration (1 hour) only if it's a new key
+            Boolean isNewKey = redisTemplate.hasKey(key);
+            if (Boolean.FALSE.equals(isNewKey)) {
+                redisTemplate.expire(key, Duration.ofHours(1)); // Set expiration for the whole key
+            }
+
+            // Remove anything older than 30 minutes
+            long thirtyMinutesAgo = now - 30L * 60_000;
+            redisTemplate.opsForZSet().removeRangeByScore(key, 0, thirtyMinutesAgo);
+        });
+
         Set<Language> skipLangs = Optional.ofNullable(scraperStates.get(videoId))
                 .map(ScraperState::getSkipLangs)
                 .orElse(Collections.emptySet());
@@ -312,4 +336,29 @@ public class YTRustScraperService {
             throw new IllegalArgumentException("Video ID cannot be null or empty.");
         }
     }
+
+    public Map<Instant, Integer> getMessageCounts(String videoId) {
+        String key = "video:" + videoId + ":messageCounts";
+        long now = System.currentTimeMillis();
+        long thirtyMinutesAgo = now - 30L * 60_000;
+
+        Set<ZSetOperations.TypedTuple<String>> recentEntries =
+                redisTemplate.opsForZSet().rangeByScoreWithScores(key, thirtyMinutesAgo, now);
+
+        Map<Instant, Integer> timeCountMap = new TreeMap<>();
+        if (recentEntries != null) {
+            for (ZSetOperations.TypedTuple<String> entry : recentEntries) {
+                long timestamp = entry.getScore().longValue();
+                Instant instant = Instant.ofEpochMilli(timestamp);
+
+                // Parse the stored messageCount
+                int count = Integer.parseInt(entry.getValue());
+                timeCountMap.put(instant, count);
+            }
+        }
+
+        // log.info("messageCounts: {}", timeCountMap);
+        return timeCountMap;
+    }
+
 }

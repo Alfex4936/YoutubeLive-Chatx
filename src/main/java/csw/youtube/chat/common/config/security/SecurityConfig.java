@@ -75,6 +75,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(req ->
                         req.requestMatchers(WHITE_LIST_URL).permitAll()    // Whitelisted paths
                                 .requestMatchers("/scrapers/**").permitAll()
+                                .requestMatchers("/scraper-monitor").permitAll()
+                                .requestMatchers("/actuator/**").permitAll()
 
                                 .requestMatchers(API_V1_PATTERN).authenticated()  // /api/v1/** paths need authentication
                                 .anyRequest().authenticated() // ALLOW ALL or AUTHENTICATED
