@@ -68,6 +68,10 @@ public class ScraperController {
             state.setTopChatters(request.topChatters());
         }
 
+        if (request.recentDonations() != null && !request.recentDonations().isEmpty()) {
+            state.setRecentDonations(request.recentDonations());
+        }
+
         if (newStatus == ScraperState.Status.IDLE && request.skipLangs() != null) {
             Set<Language> skipLangs = parseLanguages(
                     request.skipLangs().subList(0, Math.min(5, request.skipLangs().size()))
@@ -144,7 +148,8 @@ public class ScraperController {
         // Set time formatting
         DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
         domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss"));
-        domainAxis.setVerticalTickLabels(true); // Rotate for better readability
+        domainAxis.setTickLabelsVisible(true);
+        domainAxis.setLabelAngle(Math.toRadians(30)); // Rotate only tick labels
 
         // Customize line rendering (thicker line + circular markers)
         XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, true);
@@ -162,7 +167,7 @@ public class ScraperController {
 
         // Write the chart as PNG
         response.setContentType("image/png");
-        ChartUtils.writeChartAsPNG(response.getOutputStream(), chart, 900, 700);
+        ChartUtils.writeChartAsPNG(response.getOutputStream(), chart, 1000, 700);
     }
 
 
@@ -235,6 +240,7 @@ public class ScraperController {
                 runningTimeMinutes,
                 state.getSkipLangs(),
                 state.getTopChatters(),
+                state.getRecentDonations(),
                 state.getLastThroughput(),
                 state.getMaxThroughput(),
                 state.getAverageThroughput(),

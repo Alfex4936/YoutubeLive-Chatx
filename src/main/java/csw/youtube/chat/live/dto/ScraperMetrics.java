@@ -16,6 +16,7 @@ public record ScraperMetrics(
         long runningTimeMinutes, // minutes
         Set<Language> skipLangs,
         List<TopChatter> topChatters,
+        List<RecentDonator> recentDonations,
         int lastThroughput,
         int maxThroughput,
         double averageThroughput,

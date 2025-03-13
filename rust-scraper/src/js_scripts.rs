@@ -40,7 +40,7 @@ pub const CHAT_OBSERVER: &str = r##"
                 ? messageElement.shadowRoot.querySelector("#message") 
                 : messageElement.querySelector("#message");
             
-            if (!container) return;  // ✅ Allowed because it's inside a function
+            if (!container) return;
 
             let messageText = "";
             container.childNodes.forEach(node => {
@@ -60,7 +60,7 @@ pub const CHAT_OBSERVER: &str = r##"
         const chatContainer = document.querySelector("div#items");
         if (!chatContainer) {
             console.error("Chat container not found");
-            return;  // ❌ NOT ALLOWED OUTSIDE A FUNCTION! (Fixed below)
+            return;
         }
         console.log("✅ MutationObserver started");
 
@@ -87,6 +87,39 @@ pub const CHAT_OBSERVER: &str = r##"
     }
 })();
 "##;
+
+pub const DONATION_OBSERVER: &str = r#"
+(function() {
+    const observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.tagName === 'YT-LIVE-CHAT-PAID-MESSAGE-RENDERER') {
+                    try {
+                        const username = node.querySelector('#author-name').textContent.trim();
+                        const amountEl = node.querySelector('#purchase-amount');
+                        const amount = amountEl ? amountEl.textContent.trim() : 'Unknown';
+                        const messageEl = node.querySelector('#message');
+                        const message = messageEl ? messageEl.textContent.trim() : '';
+                        const timestampEl = node.querySelector('#timestamp');
+                        const timestamp = timestampEl ? timestampEl.textContent.trim() : '';
+                        
+                        window.rustDonationHandler(username, amount, message, timestamp);
+                    } catch (e) {
+                        console.error('Error processing donation:', e);
+                    }
+                }
+            }
+        }
+    });
+    
+    observer.observe(document.querySelector('yt-live-chat-item-list-renderer #items'), {
+        childList: true,
+        subtree: true
+    });
+    
+    console.log('Donation observer started');
+})();
+"#;
 
 pub const CHAT_ENDED_CHECK: &str = r#"
     (() => {

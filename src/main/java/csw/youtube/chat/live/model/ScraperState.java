@@ -1,6 +1,7 @@
 package csw.youtube.chat.live.model;
 
 import com.github.pemistahl.lingua.api.Language;
+import csw.youtube.chat.live.dto.RecentDonator;
 import csw.youtube.chat.live.dto.TopChatter;
 import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.Data;
@@ -25,6 +26,7 @@ public class ScraperState {
     private String channelName;
     private Instant createdAt;
     private List<TopChatter> topChatters = new ArrayList<>();
+    private List<RecentDonator> recentDonations = new ArrayList<>();
 
     // Counts all messages since scraper started
     private AtomicLong totalMessages = new AtomicLong(0);

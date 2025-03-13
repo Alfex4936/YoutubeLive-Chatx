@@ -70,6 +70,7 @@ public class ScraperStatsEndpoint {
                     runningTimeMinutes,
                     state.getSkipLangs(),
                     state.getTopChatters(),
+                    state.getRecentDonations(),
                     state.getLastThroughput(),
                     state.getMaxThroughput(),
                     state.getAverageThroughput(),

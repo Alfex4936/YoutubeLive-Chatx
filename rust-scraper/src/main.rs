@@ -1,6 +1,5 @@
 // src/main.rs
 use anyhow::{Context, Result};
-
 use chromiumoxide::cdp::browser_protocol::system_info::ProcessInfo;
 use chromiumoxide::{
     Browser, BrowserConfig, Element, Page,
@@ -12,7 +11,12 @@ use clap::Parser;
 use futures::StreamExt;
 use reqwest::Client;
 use serde_json::json;
+use std::borrow::Cow;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::collections::HashMap;
 use std::mem;
+use std::sync::Mutex as StdMutex;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -26,10 +30,39 @@ use tokio::{
 
 mod js_scripts;
 
+#[cfg(windows)]
+const MS_EDGE: bool = true;
+
+#[cfg(not(windows))]
+const MS_EDGE: bool = false;
+
 #[derive(Clone, Debug, serde::Serialize)]
 struct ChatMessage {
+    username: Cow<'static, str>,
+    message: Cow<'static, str>,
+}
+
+#[derive(serde::Serialize)]
+struct TopChatter {
     username: String,
+    #[serde(rename = "messageCount")]
+    message_count: usize,
+}
+
+#[derive(serde::Serialize)]
+struct RecentDonator {
+    username: String,
+    amount: String,
     message: String,
+    timestamp: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+struct DonationMessage {
+    username: String,
+    amount: String,
+    message: String,
+    timestamp: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,6 +84,80 @@ impl ScraperStatus {
     }
 }
 
+/// Simple circuit breaker implementation
+struct CircuitBreaker {
+    state: AtomicBool, // true = closed (allowing requests), false = open (blocking requests)
+    failure_count: AtomicUsize,
+    last_failure: StdMutex<Instant>,
+    threshold: usize,
+    reset_timeout: Duration,
+}
+
+impl CircuitBreaker {
+    fn new(threshold: usize, reset_timeout: Duration) -> Self {
+        Self {
+            state: AtomicBool::new(true),
+            failure_count: AtomicUsize::new(0),
+            last_failure: StdMutex::new(Instant::now()),
+            threshold,
+            reset_timeout,
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        self.state.load(Ordering::SeqCst)
+    }
+
+    fn record_success(&self) {
+        if !self.is_closed() {
+            // If we've waited long enough since the last failure, try to close the circuit
+            let last_failure = self.last_failure.lock().unwrap();
+            if last_failure.elapsed() >= self.reset_timeout {
+                self.state.store(true, Ordering::SeqCst);
+                self.failure_count.store(0, Ordering::SeqCst);
+            }
+        }
+    }
+
+    fn record_failure(&self) -> bool {
+        let current_count = self.failure_count.fetch_add(1, Ordering::SeqCst);
+
+        if current_count + 1 >= self.threshold {
+            self.state.store(false, Ordering::SeqCst);
+            *self.last_failure.lock().unwrap() = Instant::now();
+            false // Circuit is now open
+        } else {
+            true // Circuit is still closed
+        }
+    }
+
+    async fn execute<F, T>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce() -> futures::future::BoxFuture<'static, Result<T, anyhow::Error>>,
+    {
+        if !self.is_closed() {
+            let last_failure = *self.last_failure.lock().unwrap();
+            if last_failure.elapsed() < self.reset_timeout {
+                // Circuit is open and timeout hasn't elapsed
+                return Err(anyhow::anyhow!("Circuit breaker is open"));
+            }
+            // Try to close the circuit for this request
+            self.state.store(true, Ordering::SeqCst);
+        }
+
+        match f().await {
+            Ok(result) => {
+                self.record_success();
+                Ok(result)
+            }
+            Err(e) => {
+                self.record_failure();
+                Err(e)
+            }
+        }
+    }
+}
+
 #[derive(Parser)]
 struct Args {
     #[arg(long)]
@@ -67,6 +174,10 @@ async fn main() -> anyhow::Result<()> {
     let created_at = Utc::now().to_rfc3339();
     let total_messages = Arc::new(AtomicUsize::new(0));
     let is_running = Arc::new(AtomicBool::new(true));
+
+    // Create circuit breakers for backend communication
+    // let metrics_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
+    // let messages_breaker = Arc::new(CircuitBreaker::new(3, Duration::from_secs(15)));
 
     tokio::spawn(handle_signals(Arc::clone(&is_running)));
 
@@ -89,6 +200,7 @@ async fn main() -> anyhow::Result<()> {
         None,
         0,
         0,
+        None,
     )
     .await?;
 
@@ -116,6 +228,7 @@ async fn main() -> anyhow::Result<()> {
             None,
             0,
             total_messages.load(Ordering::SeqCst),
+            None,
         )
         .await;
     }
@@ -132,6 +245,9 @@ async fn scraper_main_logic(
 ) -> anyhow::Result<()> {
     let (mut browser, mut handler) = Browser::launch(config_browser()).await?;
     tokio::spawn(async move { while handler.next().await.is_some() {} });
+
+    // Add a HashMap to track message counts by username
+    let chatter_counts = Arc::new(Mutex::new(HashMap::<String, usize>::new()));
 
     let page = browser
         .new_page(format!("https://www.youtube.com/watch?v={}", args.video_id))
@@ -164,6 +280,7 @@ async fn scraper_main_logic(
     tokio::spawn(handle_chat_events(
         iframe_page.clone(),
         Arc::clone(&message_batch),
+        Arc::clone(&chatter_counts),
     ));
 
     iframe_page.evaluate(js_scripts::CHAT_OBSERVER).await?;
@@ -178,6 +295,7 @@ async fn scraper_main_logic(
         Some(&channel_name),
         0,
         0,
+        None,
     )
     .await?;
 
@@ -188,15 +306,24 @@ async fn scraper_main_logic(
     let check_chat_deadline = Duration::from_secs(15 * 60); // 15 minutes
     let mut last_message_time = Instant::now();
     let mut last_chat_check = Instant::now();
+    let mut consecutive_empty_intervals = 0 as u64; // Track consecutive intervals with no messages
 
     let max_retries = 3;
 
+    // TODO: Update video title every n minutes
+
     #[cfg(debug_assertions)]
     let mut sys = System::new_all();
+
+    // Pre-allocate batch vector to avoid repeated allocations
+    let mut batch = Vec::with_capacity(100); // Reasonable initial capacity
+
     loop {
-        if !is_running.load(Ordering::SeqCst) {
+        if !is_running.load(Ordering::Relaxed) {
+            // Use Relaxed ordering for better performance
             break;
         }
+
         let mut wait_duration = Duration::from_secs(1);
         let mut retries = 0;
 
@@ -206,34 +333,50 @@ async fn scraper_main_logic(
             let current_pid = get_current_pid().expect("Failed to get current PID");
             let pids = vec![current_pid];
             sys.refresh_processes(ProcessesToUpdate::Some(&pids), true);
-
-            // Log resource usage for the current Rust process.
             log_rust_usage(&sys);
         }
 
-        let mut batch = Vec::new(); // Pre-allocate empty batch
+        // Clear batch instead of creating a new Vec
+        batch.clear();
 
+        // Minimize lock duration by using a scope
         {
             let mut locked_batch = message_batch.lock().await;
-            mem::swap(&mut batch, &mut *locked_batch); // Swap buffers instead of cloning
+            batch.append(&mut *locked_batch); // Append is more efficient than swap for growing collections
         }
+
+        let interval_messages = batch.len();
 
         if !batch.is_empty() {
             last_message_time = Instant::now();
-            let _ = send_messages_to_backend(&client, &args.video_id, &batch).await.is_ok();
+            consecutive_empty_intervals = 0;
+
+            // Fire and forget - don't wait for result if not needed
+            tokio::spawn({
+                let client = client.clone();
+                let video_id = args.video_id.clone();
+                let batch_clone = batch.clone(); // Only clone when needed
+                async move {
+                    let _ = send_messages_to_backend(&client, &video_id, &batch_clone).await;
+                }
+            });
+        } else {
+            consecutive_empty_intervals += 1;
         }
-        //  else if Instant::now().duration_since(last_message_time) >= inactivity_limit {
-        //     #[cfg(debug_assertions)]
-        //     println!("❗️ No messages received for 30 minutes. Exiting scraper loop.");
-        //     break;
-        // }
 
-        let interval_messages = batch.len();
-        total_messages.fetch_add(interval_messages, Ordering::SeqCst);
+        total_messages.fetch_add(interval_messages, Ordering::Relaxed);
 
-        if !is_running.load(Ordering::SeqCst) {
+        if !is_running.load(Ordering::Relaxed) {
             break;
         }
+
+        // Only get top chatters when needed (not every iteration)
+        let top_chatters = if consecutive_empty_intervals % 3 == 0 {
+            get_top_chatters(&chatter_counts, 5).await
+        } else {
+            Vec::new() // Empty vec when not needed
+        };
+
         let result = send_metrics(
             &client,
             &args.video_id,
@@ -243,34 +386,65 @@ async fn scraper_main_logic(
             Some(&video_title),
             Some(&channel_name),
             interval_messages,
-            total_messages.load(Ordering::SeqCst),
+            total_messages.load(Ordering::Relaxed),
+            if top_chatters.is_empty() {
+                None
+            } else {
+                Some(&top_chatters)
+            },
         )
         .await;
 
-        if let Err(e) = result {
+        // Rest of the loop logic for error handling and checking
+        if let Err(_) = result {
             retries += 1;
-            eprintln!("⚠️ send_metrics failed (attempt {}): {}", retries, e);
-        
+            // eprintln!("⚠️ send_metrics failed (attempt {}): {}", retries, e);
+
             if retries >= max_retries {
                 eprintln!("❌ Maximum retries reached, stopping scraper...");
                 is_running.store(false, Ordering::SeqCst);
                 break;
             }
-        
+
             sleep(wait_duration).await;
             wait_duration *= 2; // Exponential backoff
-        }        
+        }
 
         let time_since_last_message = Instant::now().duration_since(last_message_time);
+        let time_since_last_check = Instant::now().duration_since(last_chat_check);
 
-        // After 15 minutes of inactivity, check via HTTP request if chat is really dead
-        if time_since_last_message >= check_chat_deadline
-            && Instant::now().duration_since(last_chat_check) >= Duration::from_secs(60)
-        {
-            if has_live_chat_ended(&client, &iframe_url).await? {
-                #[cfg(debug_assertions)]
-                println!("🔴 Live chat is unavailable (detected via HTTP request). Stopping.");
-                break;
+        // Combine conditions for better readability and performance
+        let should_check_chat = (consecutive_empty_intervals >= 3
+            && time_since_last_check >= Duration::from_secs(60))
+            || (time_since_last_message >= Duration::from_secs(5 * 60)
+                && time_since_last_check >= Duration::from_secs(30))
+            || (time_since_last_message >= check_chat_deadline
+                && time_since_last_check >= Duration::from_secs(60));
+
+        if should_check_chat {
+            #[cfg(debug_assertions)]
+            println!(
+                "Checking if chat has ended after {} consecutive empty intervals",
+                consecutive_empty_intervals
+            );
+
+            // Use a timeout to prevent hanging on network requests
+            match tokio::time::timeout(
+                Duration::from_secs(5),
+                has_live_chat_ended(&client, &iframe_url),
+            )
+            .await
+            {
+                Ok(Ok(true)) => {
+                    #[cfg(debug_assertions)]
+                    println!("🔴 Live chat is unavailable (detected via HTTP request). Stopping.");
+                    break;
+                }
+                Ok(Ok(false)) => {}
+                _ => {
+                    #[cfg(debug_assertions)]
+                    println!("⚠️ Chat check timed out or failed, continuing...");
+                }
             }
             last_chat_check = Instant::now();
         }
@@ -282,13 +456,19 @@ async fn scraper_main_logic(
             break;
         }
 
-        sleep(Duration::from_secs(10)).await;
+        // Adaptive sleep duration based on activity
+        let sleep_duration = if consecutive_empty_intervals > 5 {
+            // Shorter sleep when we suspect the stream might be ending
+            Duration::from_secs(5)
+        } else {
+            Duration::from_secs(10)
+        };
 
-        if !is_running.load(Ordering::SeqCst) {
-            break;
-        }
+        sleep(sleep_duration).await;
     }
 
+    // Include top chatters in final metrics
+    let top_chatters = get_top_chatters(&chatter_counts, 5).await;
     send_metrics(
         &client,
         &args.video_id,
@@ -299,6 +479,7 @@ async fn scraper_main_logic(
         Some(&channel_name),
         0,
         total_messages.load(Ordering::SeqCst),
+        Some(&top_chatters),
     )
     .await?;
 
@@ -372,6 +553,7 @@ async fn send_metrics(
     channel_name: Option<&str>,
     messages_in_last_interval: usize,
     total_messages: usize,
+    top_chatters: Option<&[TopChatter]>,
 ) -> Result<()> {
     let mut body = json!({
         "videoId": video_id,
@@ -394,6 +576,11 @@ async fn send_metrics(
         }
     }
 
+    // Add top chatters to metrics if available
+    if let Some(chatters) = top_chatters {
+        body["topChatters"] = json!(chatters);
+    }
+
     client
         .patch("http://localhost:8080/scrapers/updateMetrics")
         .json(&body)
@@ -402,7 +589,6 @@ async fn send_metrics(
 
     Ok(())
 }
-
 
 async fn send_messages_to_backend(
     client: &Client,
@@ -422,10 +608,11 @@ async fn send_messages_to_backend(
 
 fn config_browser() -> BrowserConfig {
     let user_data_dir = tempdir().expect("Failed to create temp dir");
-
+    // let chrome_path = "D:\\SDK\\ungoogled-chromium_134.0.6998.35-1.1_windows_x64\\chrome.exe";
     BrowserConfig::builder()
         .no_sandbox()
         .chrome_executable(
+            // chrome_path,
             default_executable(DetectionOptions {
                 msedge: false,
                 unstable: true,
@@ -438,6 +625,8 @@ fn config_browser() -> BrowserConfig {
             "--single-process",
             "--no-zygote",
             "--no-startup-window",
+            "--enable-low-end-device-mode", // Optimize for lower memory usage
+            "--memory-pressure-off",        // Prevent aggressive memory reclaiming
             "--remote-debugging-port=0",
             "--disable-popup-blocking",
             "--disable-crash-reporter",
@@ -502,20 +691,91 @@ async fn setup_js_bindings(page: &Page) -> Result<()> {
     Ok(())
 }
 
-// async fn handle_chat_events(page: Page, counter: Arc<AtomicUsize>) -> Result<()> {
-async fn handle_chat_events(page: Page, message_batch: Arc<Mutex<Vec<ChatMessage>>>) -> Result<()> {
+async fn get_top_chatters(
+    chatter_counts: &Arc<Mutex<HashMap<String, usize>>>,
+    count: usize,
+) -> Vec<TopChatter> {
+    let counts = chatter_counts.lock().await;
+
+    // Skip the work if there are no chatters or count is zero
+    if counts.is_empty() || count == 0 {
+        return Vec::new();
+    }
+
+    // If we have fewer entries than requested count, no need for heap
+    if counts.len() <= count {
+        return counts
+            .iter()
+            .map(|(username, &message_count)| TopChatter {
+                username: username.clone(),
+                message_count,
+            })
+            .collect();
+    }
+
+    // Use a min-heap for efficient top-N extraction
+    let mut heap = BinaryHeap::with_capacity(count);
+
+    // Pre-fill with first 'count' elements to avoid unnecessary pushes/pops
+    let mut iter = counts.iter();
+    for _ in 0..count {
+        if let Some((username, &message_count)) = iter.next() {
+            heap.push(Reverse((message_count, username)));
+        } else {
+            break;
+        }
+    }
+
+    // Process remaining elements
+    for (username, &message_count) in iter {
+        let min = heap.peek().unwrap().0;
+        if message_count > min.0 {
+            heap.pop();
+            heap.push(Reverse((message_count, username)));
+        }
+    }
+
+    // Convert to Vec in descending order (most messages first)
+    let mut result = Vec::with_capacity(heap.len());
+    for Reverse((count, name)) in heap.into_sorted_vec().into_iter().rev() {
+        result.push(TopChatter {
+            username: name.clone(),
+            message_count: count,
+        });
+    }
+
+    result
+}
+
+async fn handle_chat_events(
+    page: Page,
+    message_batch: Arc<Mutex<Vec<ChatMessage>>>,
+    chatter_counts: Arc<Mutex<HashMap<String, usize>>>,
+) -> Result<()> {
     let mut events = page
         .event_listener::<chromiumoxide::cdp::js_protocol::runtime::EventBindingCalled>()
         .await?;
+
+    // TODO track unique users
+    // NOTE string intern?
 
     while let Some(event) = events.next().await {
         if event.name == "rustChatHandler" {
             let parts: Vec<&str> = event.payload.split('\t').collect();
             if parts.len() == 2 {
                 let username = parts[0].to_string();
-                let message = parts[1].to_string();
+                let message = Cow::Owned(parts[1].to_string());
 
-                let chat_msg = ChatMessage { username, message };
+                // Update chatter counts
+                {
+                    let mut counts = chatter_counts.lock().await;
+                    *counts.entry(username.clone()).or_insert(0) += 1;
+                }
+
+                let chat_msg = ChatMessage {
+                    username: Cow::Owned(username),
+                    message,
+                };
 
                 message_batch.lock().await.push(chat_msg);
             }
@@ -558,4 +818,5 @@ async fn has_live_chat_ended(client: &Client, iframe_url: &str) -> anyhow::Resul
     채팅을 사용할 수 없는 실시간 스트림입니다.
 </yt-formatted-string>
 
+https://www.youtube.com/live?app=desktop&persist_gl=1&gl=US
 */

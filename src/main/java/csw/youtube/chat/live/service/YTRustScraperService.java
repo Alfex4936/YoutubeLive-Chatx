@@ -122,12 +122,12 @@ public class YTRustScraperService {
             // Set expiration (1 hour) only if it's a new key
             Boolean isNewKey = redisTemplate.hasKey(key);
             if (Boolean.FALSE.equals(isNewKey)) {
-                redisTemplate.expire(key, Duration.ofHours(1)); // Set expiration for the whole key
+                redisTemplate.expire(key, Duration.ofHours(2)); // Set expiration for the whole key
             }
 
-            // Remove anything older than 30 minutes
-            long thirtyMinutesAgo = now - 30L * 60_000;
-            redisTemplate.opsForZSet().removeRangeByScore(key, 0, thirtyMinutesAgo);
+            // Remove anything older than minutes
+            long minutesAgo = now - 60L * 60_000;
+            redisTemplate.opsForZSet().removeRangeByScore(key, 0, minutesAgo);
         });
 
         Set<Language> skipLangs = Optional.ofNullable(scraperStates.get(videoId))
@@ -340,10 +340,10 @@ public class YTRustScraperService {
     public Map<Instant, Integer> getMessageCounts(String videoId) {
         String key = "video:" + videoId + ":messageCounts";
         long now = System.currentTimeMillis();
-        long thirtyMinutesAgo = now - 30L * 60_000;
+        long minutesAgo = now - 60L * 60_000;
 
         Set<ZSetOperations.TypedTuple<String>> recentEntries =
-                redisTemplate.opsForZSet().rangeByScoreWithScores(key, thirtyMinutesAgo, now);
+                redisTemplate.opsForZSet().rangeByScoreWithScores(key, minutesAgo, now);
 
         Map<Instant, Integer> timeCountMap = new TreeMap<>();
         if (recentEntries != null) {
