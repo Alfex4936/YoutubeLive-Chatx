@@ -29,7 +29,7 @@ public class RankingService {
     private static final int MAX_KEYWORDS = 200; // Configurable maximum ranking size
     private static final int MAX_LANG_RANKINGS = 3; // top 3 langs
     // Expiration time for each video's keyword ranking key, e.g., minutes
-    private static final long EXPIRATION_MINUTES = 120L;
+    private static final long EXPIRATION_MINUTES = 16L;
 
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -163,26 +163,16 @@ public class RankingService {
             return;
         }
 
-        String key = "video:" + videoId + ":keywords";
+        long currentMinute = System.currentTimeMillis() / 60000; // Current minute timestamp
+        String key = "video:" + videoId + ":keywords:" + currentMinute;
+
         // Basic tokenization (consider more robust parsing if needed)
         String[] words = message.split("\\s+");
         for (String word : words) {
-            if (word.codePointCount(0, word.length()) < 3 || isNumeric(word)) {
+            if (word.codePointCount(0, word.length()) < 3 || isNumeric(word) ||
+                    isSymbolOnly(word) || word.chars().distinct().count() == 1 ||
+                    word.chars().allMatch(ch -> (ch >= 'ㅏ' && ch <= 'ㅣ'))) {
                 continue;
-            }
-
-            if (isSymbolOnly(word)) {
-                continue; // Skip if the word is entirely symbols
-            }
-
-            if (word.chars().distinct().count() == 1) {
-                continue; // Skip words that are made of a single repeated character
-            }
-
-            if (word.chars().allMatch(ch ->
-                    // (ch >= 'ㄱ' && ch <= 'ㅎ') || // Korean consonants
-                            (ch >= 'ㅏ' && ch <= 'ㅣ'))) { // Korean vowels
-                continue; // Skip words containing only these characters
             }
 
 
@@ -193,11 +183,12 @@ public class RankingService {
             // Atomically increment the score for the keyword.
             redisTemplate.opsForZSet().incrementScore(key, keyword, 1);
         }
+
         // Trim the sorted set to MAX_KEYWORDS to conserve memory.
-        Long total = redisTemplate.opsForZSet().size(key);
-        if (total != null && total > MAX_KEYWORDS) {
-            redisTemplate.opsForZSet().removeRange(key, 0, total - MAX_KEYWORDS - 1);
-        }
+//        Long total = redisTemplate.opsForZSet().size(key);
+//        if (total != null && total > MAX_KEYWORDS) {
+//            redisTemplate.opsForZSet().removeRange(key, 0, total - MAX_KEYWORDS - 1);
+//        }
         // Set an expiration time for the keyword ranking key.
         redisTemplate.expire(key, EXPIRATION_MINUTES, TimeUnit.MINUTES);
     }
@@ -215,17 +206,29 @@ public class RankingService {
     }
 
     public List<KeywordRankingPair> getTopKeywordStrings(String videoId, int k) {
-        String key = "video:" + videoId + ":keywords";
-        Set<ZSetOperations.TypedTuple<String>> typedTuples =
-                redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, k - 1);
+        long currentMinute = System.currentTimeMillis() / 60000;
 
-        // If null or empty, return an empty list
-        if (typedTuples == null || typedTuples.isEmpty()) {
+        List<String> keys = new ArrayList<>();
+        for (int i = 0; i < 15; i++) {
+            keys.add("video:" + videoId + ":keywords:" + (currentMinute - i));
+        }
+
+        String tempAggregateKey = "video:" + videoId + ":keywords:temp:" + UUID.randomUUID();
+        // Aggregate scores into temporary sorted set
+        redisTemplate.opsForZSet().unionAndStore(keys.getFirst(), keys, tempAggregateKey);
+
+        // Fetch top K from the temporary aggregated set
+        Set<ZSetOperations.TypedTuple<String>> topKeywords =
+                redisTemplate.opsForZSet().reverseRangeWithScores(tempAggregateKey, 0, k - 1);
+
+        redisTemplate.delete(tempAggregateKey); // Cleanup temp key immediately
+
+        if (topKeywords == null || topKeywords.isEmpty()) {
             return Collections.emptyList();
         }
 
-        return typedTuples.stream()
-                .map(tuple -> new KeywordRankingPair(tuple.getValue(), tuple.getScore())) // Extract keyword + score
+        return topKeywords.stream()
+                .map(tuple -> new KeywordRankingPair(tuple.getValue(), tuple.getScore()))
                 .collect(Collectors.toList());
     }
 

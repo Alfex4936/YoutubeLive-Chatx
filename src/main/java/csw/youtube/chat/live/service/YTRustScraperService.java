@@ -9,7 +9,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.RedissonShutdownException;
 import org.redisson.api.RBlockingQueue;
 import org.redisson.api.RSemaphore;
 import org.redisson.api.RedissonClient;
@@ -29,6 +28,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -42,9 +42,6 @@ public class YTRustScraperService {
     private static final Duration FAILED_SCRAPER_CLEANUP_THRESHOLD = Duration.ofMinutes(5);
     private static final int MAX_CONCURRENT_SCRAPERS = 5;
     private static final String RUST_SCRAPER_PATH = "src/main/resources/ytchatx-scraper.exe";
-    private volatile boolean isShuttingDown = false;
-    private Thread queueProcessorThread;
-
     @Getter
     private final Map<String, ScraperState> scraperStates = new ConcurrentHashMap<>();
     private final ProfanityLogService profanityLogService;
@@ -54,6 +51,8 @@ public class YTRustScraperService {
     private final RBlockingQueue<ScraperTask> scraperQueue;
     private final RSemaphore scraperSemaphore;
     private final StringRedisTemplate redisTemplate;
+    private volatile boolean isShuttingDown = false;
+    private Thread queueProcessorThread;
 
     public YTRustScraperService(
             ProfanityLogService profanityLogService,
@@ -74,6 +73,12 @@ public class YTRustScraperService {
     }
 
     // Lifecycle Methods
+
+    protected static void validateVideoId(String videoId) {
+        if (Objects.isNull(videoId) || videoId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Video ID cannot be null or empty.");
+        }
+    }
 
     @Scheduled(fixedRate = 600_000)
     public void cleanupFailedScrapers() {
@@ -102,12 +107,12 @@ public class YTRustScraperService {
         stopAllActiveScrapers();
     }
 
+    // Core Functionality
+
     @PostConstruct
     public void startQueueProcessor() {
         queueProcessorThread = Thread.ofVirtual().start(this::processQueue);
     }
-
-    // Core Functionality
 
     public void processChatMessages(String videoId, List<SimpleChatMessage> messages) {
         chatScraperExecutor.execute(() -> {
@@ -116,18 +121,12 @@ public class YTRustScraperService {
 
             String key = "video:" + videoId + ":messageCounts";
 
-            // Store the "count" as the value and "now" as the score
             redisTemplate.opsForZSet().add(key, String.valueOf(messageCount), now);
+            redisTemplate.expire(key, Duration.ofHours(2)); // ✅ Set every time, sliding expiration
 
-            // Set expiration (1 hour) only if it's a new key
-            Boolean isNewKey = redisTemplate.hasKey(key);
-            if (Boolean.FALSE.equals(isNewKey)) {
-                redisTemplate.expire(key, Duration.ofHours(2)); // Set expiration for the whole key
-            }
-
-            // Remove anything older than minutes
-            long minutesAgo = now - 60L * 60_000;
-            redisTemplate.opsForZSet().removeRangeByScore(key, 0, minutesAgo);
+            // Remove data older than 1 hour
+            long oneHourAgo = now - TimeUnit.HOURS.toMillis(1);
+            redisTemplate.opsForZSet().removeRangeByScore(key, 0, oneHourAgo);
         });
 
         Set<Language> skipLangs = Optional.ofNullable(scraperStates.get(videoId))
@@ -160,6 +159,8 @@ public class YTRustScraperService {
         return enqueueScraperTask(videoId, skipLangs, state);
     }
 
+    // Private Helper Methods
+
     public String stopRustScraper(String videoId) {
         var process = activeScrapers.remove(videoId);
         if (process == null) return "No active scraper found for video ID: " + videoId;
@@ -169,8 +170,6 @@ public class YTRustScraperService {
         updateStateOnStop(videoId);
         return "Scraper stopped for video ID: " + videoId;
     }
-
-    // Private Helper Methods
 
     private List<String> buildCommand(String videoId, Set<Language> skipLangs) {
         List<String> command = new ArrayList<>(List.of(RUST_SCRAPER_PATH, "--video-id=" + videoId));
@@ -329,12 +328,6 @@ public class YTRustScraperService {
                     state.setStatus(ScraperState.Status.COMPLETED);
                     state.setErrorMessage("Stopped by user.");
                 });
-    }
-
-    protected static void validateVideoId(String videoId) {
-        if (Objects.isNull(videoId) || videoId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Video ID cannot be null or empty.");
-        }
     }
 
     public Map<Instant, Integer> getMessageCounts(String videoId) {

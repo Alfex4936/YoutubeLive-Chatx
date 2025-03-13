@@ -4,7 +4,7 @@
 
 <table>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/335ea176-7745-41d9-b388-44a3d281b377" width="600"></td>
+    <td><img src="https://github.com/user-attachments/assets/5bcbb942-569c-4991-828b-3a33f8b6084f" width="600"></td>
     <td><img src="https://github.com/user-attachments/assets/c8c1d265-61e5-4459-a53e-bc0fe34385a1" width="600"></td>
   </tr>
   <tr>
@@ -48,7 +48,7 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로
   - 언어 감지 (특정 언어는 랭킹에서 제외)
   - 언어 통계 (top 3 언어 %)
   - 가장 많이 채팅한 사용자
-  - 최근 10 도네이션
+  - 최근 10 도네이션 (TODO: 환율 변경기)
   - [ ] 고유 사용자 수 집계
   - [ ] 그래프 저장 (지난 방송과 비교, 채팅 트렌드 비교)
     - [x] 30분 동안 메시지 수 차트 그래프

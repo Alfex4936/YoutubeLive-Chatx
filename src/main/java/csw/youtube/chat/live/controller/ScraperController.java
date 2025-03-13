@@ -148,8 +148,8 @@ public class ScraperController {
         // Set time formatting
         DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
         domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss"));
-        domainAxis.setTickLabelsVisible(true);
-        domainAxis.setLabelAngle(Math.toRadians(30)); // Rotate only tick labels
+        domainAxis.setLabelAngle(0);              // No rotation for "Time"
+        domainAxis.setVerticalTickLabels(true);   // Vertical tick labels (timestamps)
 
         // Customize line rendering (thicker line + circular markers)
         XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, true);
