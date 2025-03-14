@@ -60,6 +60,10 @@ dependencies {
 	// https://mvnrepository.com/artifact/org.jfree/jfreechart
 	implementation("org.jfree:jfreechart:1.5.5")
 
+	implementation("com.nimbusds:nimbus-jose-jwt:10.0.2")
+	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.4.3")
+	implementation("org.springframework.boot:spring-boot-starter-oauth2-client:3.4.3")
+
 
 	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")

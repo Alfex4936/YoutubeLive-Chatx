@@ -31,15 +31,58 @@ pub const RUST_HANDLER: &str = r#"
 }
 "#;
 
+pub const RUST_DONOR_HANDLER: &str = r#"
+(data) => {
+    let parts = data.split('\t');
+    if (parts.length === 3) {
+        let donor = parts[0];
+        let amount = parts[1];
+        let message = parts[2];
+        window._sendToRust2(donor, amount, message);
+    }
+}
+"#;
+
 pub const CHAT_OBSERVER: &str = r##"
 (function() {
     try {
-        function extractMessageData(messageElement) {
+        function extractPaidMessageData(messageElement) {
+            const usernameElem = messageElement.querySelector("#author-name");
+            const amountElem = messageElement.querySelector("#purchase-amount");
+            const messageContainer = messageElement.querySelector("#message");
+
+            if (!usernameElem || !amountElem || !messageContainer) {
+                return;
+            }
+
+            const username = usernameElem.innerText.trim() || "Unknown Donor";
+            // Donation amount (e.g. "THB 40.00")
+            const amount = amountElem.innerText.trim() || "0";
+            // Donation message (with possible emojis)
+            let messageText = "";
+            messageContainer.childNodes.forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                messageText += node.textContent;
+                } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === "img") {
+                // Some paid messages also insert <img> for emojis
+                const emoji = node.getAttribute("shared-tooltip-text") || node.getAttribute("alt") || "";
+                messageText += emoji;
+                }
+            });
+
+            // "name|amount|message"
+            window.rustDonationChatHandler(`${username}\t${amount}\t${messageText}`);
+        }
+        function extractNormalChatData(messageElement) {
+            // Skip moderator messages
+            if (messageElement.getAttribute("author-type") === "moderator") {
+                return;
+            }
+
             const username = messageElement.querySelector("#author-name")?.innerText.trim() || "Unknown User";
             const container = messageElement.shadowRoot 
                 ? messageElement.shadowRoot.querySelector("#message") 
                 : messageElement.querySelector("#message");
-            
             if (!container) return;
 
             let messageText = "";
@@ -68,12 +111,19 @@ pub const CHAT_OBSERVER: &str = r##"
             window._chatObserver.disconnect();
         }
 
-        const observer = new MutationObserver((mutations) => {
+        const observer = new MutationObserver(mutations => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === Node.ELEMENT_NODE && node.matches("yt-live-chat-text-message-renderer")) {
-                        extractMessageData(node);
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // normal text-chat message
+                    if (node.matches("yt-live-chat-text-message-renderer")) {
+                        extractNormalChatData(node);
                     }
+                    // paid (donation) message
+                    else if (node.matches("yt-live-chat-paid-message-renderer")) {
+                        extractPaidMessageData(node);
+                    }
+                }
                 });
             });
         });
@@ -87,39 +137,6 @@ pub const CHAT_OBSERVER: &str = r##"
     }
 })();
 "##;
-
-pub const DONATION_OBSERVER: &str = r#"
-(function() {
-    const observer = new MutationObserver(mutations => {
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
-                if (node.tagName === 'YT-LIVE-CHAT-PAID-MESSAGE-RENDERER') {
-                    try {
-                        const username = node.querySelector('#author-name').textContent.trim();
-                        const amountEl = node.querySelector('#purchase-amount');
-                        const amount = amountEl ? amountEl.textContent.trim() : 'Unknown';
-                        const messageEl = node.querySelector('#message');
-                        const message = messageEl ? messageEl.textContent.trim() : '';
-                        const timestampEl = node.querySelector('#timestamp');
-                        const timestamp = timestampEl ? timestampEl.textContent.trim() : '';
-                        
-                        window.rustDonationHandler(username, amount, message, timestamp);
-                    } catch (e) {
-                        console.error('Error processing donation:', e);
-                    }
-                }
-            }
-        }
-    });
-    
-    observer.observe(document.querySelector('yt-live-chat-item-list-renderer #items'), {
-        childList: true,
-        subtree: true
-    });
-    
-    console.log('Donation observer started');
-})();
-"#;
 
 pub const CHAT_ENDED_CHECK: &str = r#"
     (() => {

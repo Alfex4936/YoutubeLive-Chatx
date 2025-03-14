@@ -1,7 +1,7 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
-import csw.youtube.chat.common.annotation.ApiV1;
+import csw.youtube.chat.common.util.LocalDater;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.dto.MessagesRequest;
 import csw.youtube.chat.live.dto.MetricsUpdateRequest;
@@ -11,7 +11,6 @@ import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTRustScraperService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
 import org.jfree.chart.JFreeChart;
@@ -102,7 +101,7 @@ public class ScraperController {
     }
 
     @GetMapping("/messageGraph")
-    public void getMessageGraph(@RequestParam String videoId, HttpServletResponse response) throws IOException {
+    public void getMessageGraph(@RequestParam String videoId, @RequestParam String lang, HttpServletResponse response) throws IOException {
         ScraperState state = scraperService.getScraperState(videoId);
         if (state == null || !state.isActiveOrDead()) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -135,8 +134,11 @@ public class ScraperController {
         chart.setTitle(new TextTitle(state.getVideoTitle(), titleFont));
 
         // Subtitle for video URL
+        Locale locale = LocalDater.getLocaleFromLang(lang);
+        String formattedDate = LocalDater.getLocalizedDate(locale);
+
         String videoUrl = scraperService.getScraperState(videoId).getVideoUrl();
-        TextTitle subtitle = new TextTitle(new SimpleDateFormat("MMMM dd, yyyy").format(Date.from(Instant.now())) + " | " + videoUrl, new Font("SansSerif", Font.ITALIC, 12));
+        TextTitle subtitle = new TextTitle(formattedDate + " | " + videoUrl, new Font("SansSerif", Font.ITALIC, 12));
         chart.addSubtitle(subtitle);
 
         // Apply custom styling
@@ -147,7 +149,7 @@ public class ScraperController {
 
         // Set time formatting
         DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
-        domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss"));
+        domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss", locale));
         domainAxis.setLabelAngle(0);              // No rotation for "Time"
         domainAxis.setVerticalTickLabels(true);   // Vertical tick labels (timestamps)
 
@@ -193,6 +195,9 @@ public class ScraperController {
         }
         Set<Language> skipLangs = parseLanguages(langs);
 
+        if (videoId.startsWith("/")) {
+            videoId = videoId.substring(1);
+        }
         if (videoId.startsWith("http")) {
             videoId = videoId.replace(YTRustScraperService.YOUTUBE_WATCH_URL, "");
         }

@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-@Component
+//@Component
 public class JwtService {
 
     @Value("${application.security.jwt.secret-key}")

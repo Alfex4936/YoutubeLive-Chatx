@@ -10,11 +10,12 @@ use chrono::Utc;
 use clap::Parser;
 use futures::StreamExt;
 use reqwest::Client;
+use rustc_hash::FxHashMap as HashMap;
 use serde_json::json;
 use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use std::mem;
 use std::sync::Mutex as StdMutex;
 use std::sync::{
@@ -49,20 +50,11 @@ struct TopChatter {
     message_count: usize,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct RecentDonator {
     username: String,
-    amount: String,
+    amount: String, // like THB 100.00, $100.00 ...
     message: String,
-    timestamp: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize)]
-struct DonationMessage {
-    username: String,
-    amount: String,
-    message: String,
-    timestamp: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -86,11 +78,11 @@ impl ScraperStatus {
 
 /// Simple circuit breaker implementation
 struct CircuitBreaker {
-    state: AtomicBool, // true = closed (allowing requests), false = open (blocking requests)
-    failure_count: AtomicUsize,
-    last_failure: StdMutex<Instant>,
-    threshold: usize,
+    last_failure: StdMutex<Instant>, // Largest (typically)
     reset_timeout: Duration,
+    threshold: usize,
+    failure_count: AtomicUsize,
+    state: AtomicBool, // Smallest
 }
 
 impl CircuitBreaker {
@@ -201,6 +193,7 @@ async fn main() -> anyhow::Result<()> {
         0,
         0,
         None,
+        None,
     )
     .await?;
 
@@ -229,6 +222,7 @@ async fn main() -> anyhow::Result<()> {
             0,
             total_messages.load(Ordering::SeqCst),
             None,
+            None,
         )
         .await;
     }
@@ -247,7 +241,9 @@ async fn scraper_main_logic(
     tokio::spawn(async move { while handler.next().await.is_some() {} });
 
     // Add a HashMap to track message counts by username
-    let chatter_counts = Arc::new(Mutex::new(HashMap::<String, usize>::new()));
+    let chatter_counts = Arc::new(Mutex::new(HashMap::<String, usize>::default()));
+    // Add a collection to track recent donations (limited to 10)
+    let recent_donations = Arc::new(Mutex::new(Vec::<RecentDonator>::with_capacity(10)));
 
     let page = browser
         .new_page(format!("https://www.youtube.com/watch?v={}", args.video_id))
@@ -281,9 +277,10 @@ async fn scraper_main_logic(
         iframe_page.clone(),
         Arc::clone(&message_batch),
         Arc::clone(&chatter_counts),
+        Arc::clone(&recent_donations),
     ));
 
-    iframe_page.evaluate(js_scripts::CHAT_OBSERVER).await?;
+    iframe_page.evaluate(js_scripts::CHAT_OBSERVER).await?; // also checking donation
 
     send_metrics(
         &client,
@@ -295,6 +292,7 @@ async fn scraper_main_logic(
         Some(&channel_name),
         0,
         0,
+        None,
         None,
     )
     .await?;
@@ -316,7 +314,8 @@ async fn scraper_main_logic(
     let mut sys = System::new_all();
 
     // Pre-allocate batch vector to avoid repeated allocations
-    let mut batch = Vec::with_capacity(100); // Reasonable initial capacity
+    // which fits nicely in most L1 caches (typically 32-64KB)
+    let mut batch = Vec::with_capacity(64); // Reasonable initial capacity
 
     loop {
         if !is_running.load(Ordering::Relaxed) {
@@ -377,6 +376,8 @@ async fn scraper_main_logic(
             Vec::new() // Empty vec when not needed
         };
 
+        let recent_donators = get_recent_donators(&recent_donations).await;
+
         let result = send_metrics(
             &client,
             &args.video_id,
@@ -391,6 +392,11 @@ async fn scraper_main_logic(
                 None
             } else {
                 Some(&top_chatters)
+            },
+            if recent_donators.is_empty() {
+                None
+            } else {
+                Some(&recent_donators)
             },
         )
         .await;
@@ -469,6 +475,7 @@ async fn scraper_main_logic(
 
     // Include top chatters in final metrics
     let top_chatters = get_top_chatters(&chatter_counts, 5).await;
+    let recent_donations = get_recent_donators(&recent_donations).await;
     send_metrics(
         &client,
         &args.video_id,
@@ -480,6 +487,7 @@ async fn scraper_main_logic(
         0,
         total_messages.load(Ordering::SeqCst),
         Some(&top_chatters),
+        Some(&recent_donations),
     )
     .await?;
 
@@ -554,6 +562,7 @@ async fn send_metrics(
     messages_in_last_interval: usize,
     total_messages: usize,
     top_chatters: Option<&[TopChatter]>,
+    recent_donators: Option<&[RecentDonator]>,
 ) -> Result<()> {
     let mut body = json!({
         "videoId": video_id,
@@ -579,6 +588,11 @@ async fn send_metrics(
     // Add top chatters to metrics if available
     if let Some(chatters) = top_chatters {
         body["topChatters"] = json!(chatters);
+    }
+
+    // Add recent donators to metrics if available
+    if let Some(donators) = recent_donators {
+        body["recentDonations"] = json!(donators);
     }
 
     client
@@ -688,6 +702,8 @@ async fn get_iframe_url(page: &Page) -> Result<String> {
 async fn setup_js_bindings(page: &Page) -> Result<()> {
     page.expose_function("rustChatHandler", js_scripts::RUST_HANDLER)
         .await?;
+    page.expose_function("rustDonationChatHandler", js_scripts::RUST_DONOR_HANDLER)
+        .await?;
     Ok(())
 }
 
@@ -747,10 +763,18 @@ async fn get_top_chatters(
     result
 }
 
+async fn get_recent_donators(
+    recent_donations: &Arc<Mutex<Vec<RecentDonator>>>,
+) -> Vec<RecentDonator> {
+    let donations = recent_donations.lock().await;
+    donations.clone()
+}
+
 async fn handle_chat_events(
     page: Page,
     message_batch: Arc<Mutex<Vec<ChatMessage>>>,
     chatter_counts: Arc<Mutex<HashMap<String, usize>>>,
+    recent_donations: Arc<Mutex<Vec<RecentDonator>>>,
 ) -> Result<()> {
     let mut events = page
         .event_listener::<chromiumoxide::cdp::js_protocol::runtime::EventBindingCalled>()
@@ -778,6 +802,32 @@ async fn handle_chat_events(
                 };
 
                 message_batch.lock().await.push(chat_msg);
+            }
+        } else if event.name == "rustDonationChatHandler" {
+            // Handle donation messages
+            let parts: Vec<&str> = event.payload.split('\t').collect();
+            if parts.len() == 3 {
+                let username = parts[0].to_string();
+                let amount = parts[1].to_string();
+                let message = parts[2].to_string();
+
+                // Add to recent donations, keeping only the most recent ones
+                let mut donations = recent_donations.lock().await;
+
+                // More efficient: if at capacity, remove last item before adding new one
+                if donations.len() >= 10 {
+                    // Use swap_remove for O(1) removal (order not preserved)
+                    // or rotate_left + truncate to maintain chronological order
+                    donations.rotate_left(1);
+                    donations.truncate(9);
+                }
+
+                // Add new donation at the end
+                donations.push(RecentDonator {
+                    username,
+                    amount,
+                    message,
+                });
             }
         }
     }
@@ -819,4 +869,8 @@ async fn has_live_chat_ended(client: &Client, iframe_url: &str) -> anyhow::Resul
 </yt-formatted-string>
 
 https://www.youtube.com/live?app=desktop&persist_gl=1&gl=US
+
+https://www.youtube.com/live_chat?is_popout=1&v=kPbEAbLCX7g
+
+TODO: we dont have to find iframe as above link works
 */

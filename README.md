@@ -4,8 +4,8 @@
 
 <table>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/5bcbb942-569c-4991-828b-3a33f8b6084f" width="600"></td>
-    <td><img src="https://github.com/user-attachments/assets/c8c1d265-61e5-4459-a53e-bc0fe34385a1" width="600"></td>
+    <td><img src="https://github.com/user-attachments/assets/5bcbb942-569c-4991-828b-3a33f8b6084f" width="700"></td>
+    <td><img src="https://github.com/user-attachments/assets/234312e4-40f6-4d8d-869b-d181b69c03eb" width="700"></td>
   </tr>
   <tr>
     <td>Korean</td>

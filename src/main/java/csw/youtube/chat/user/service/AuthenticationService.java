@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthenticationService {
     private final UserRepository repository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    // private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
     @Transactional // Dirty Read
@@ -56,41 +56,41 @@ public class AuthenticationService {
 //                .build();
     }
 
-    public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.username(),
-                        request.password()
-                )
-        );
-        var user = repository.findByUsername(request.username())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        var jwtToken = jwtService.generateToken(user);
-        var refreshToken = jwtService.generateRefreshToken(user);
-        return AuthenticationResponse.builder()
-                .accessToken(jwtToken)
-                .refreshToken(refreshToken)
-                .build();
-    }
-
-    public AuthenticationResponse refreshToken(
-            RefreshTokenRequest request
-    ) {
-        String userEmail = jwtService.extractUsername(request.refreshToken());
-        if (userEmail != null) {
-            var user = this.repository.findByUsername(userEmail)
-                    .orElseThrow();
-            if (jwtService.isTokenValid(request.refreshToken(), user)) {
-                var accessToken = jwtService.generateToken(user);
-                var newRefreshToken = jwtService.generateRefreshToken(user);
-                return AuthenticationResponse.builder()
-                        .accessToken(accessToken)
-                        .refreshToken(newRefreshToken)
-                        .build();
-            }
-        }
-        throw new RuntimeException("Invalid refresh token");
-    }
+//    public AuthenticationResponse authenticate(AuthenticationRequest request) {
+//        authenticationManager.authenticate(
+//                new UsernamePasswordAuthenticationToken(
+//                        request.username(),
+//                        request.password()
+//                )
+//        );
+//        var user = repository.findByUsername(request.username())
+//                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+//        var jwtToken = jwtService.generateToken(user);
+//        var refreshToken = jwtService.generateRefreshToken(user);
+//        return AuthenticationResponse.builder()
+//                .accessToken(jwtToken)
+//                .refreshToken(refreshToken)
+//                .build();
+//    }
+//
+//    public AuthenticationResponse refreshToken(
+//            RefreshTokenRequest request
+//    ) {
+//        String userEmail = jwtService.extractUsername(request.refreshToken());
+//        if (userEmail != null) {
+//            var user = this.repository.findByUsername(userEmail)
+//                    .orElseThrow();
+//            if (jwtService.isTokenValid(request.refreshToken(), user)) {
+//                var accessToken = jwtService.generateToken(user);
+//                var newRefreshToken = jwtService.generateRefreshToken(user);
+//                return AuthenticationResponse.builder()
+//                        .accessToken(accessToken)
+//                        .refreshToken(newRefreshToken)
+//                        .build();
+//            }
+//        }
+//        throw new RuntimeException("Invalid refresh token");
+//    }
 
     // 단순 조회 (BEGIN과 COMMIT 명령이 추가로 실행되지 않음)
     @Transactional(readOnly = true, propagation = Propagation.SUPPORTS)
