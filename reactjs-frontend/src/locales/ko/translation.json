@@ -24,6 +24,7 @@
       "running": "실행 중",
       "stopped": "중지됨"
     },
+    "topChatters": "상위 채팅자",
     "performance": "성능 지표",
     "runningTime": "실행 시간",
     "minutes": "분",
@@ -37,8 +38,11 @@
       "peakInterval": "최대 10초 간격",
       "unit": "메시지/초"
     },
+    "graphNotAvailable": "그래프 이용불가",
+    "messageGraph": "메시지 활동 그래프",
+    "recentDonations": "최근 10개 도네이션",
     "started": "시작:",
-    "topKeywords": "주요 키워드 (최근)",
+    "topKeywords": "주요 키워드 (최근 15분)",
     "filteredLanguages": "필터링된 언어",
     "languageDistribution": "언어 분포"
   },
@@ -55,6 +59,16 @@
     "id": "ID:",
     "youtube": "@유튜브",
     "clearHistory": "기록 지우기",
+    "close": "닫기"
+  },
+  "donations": {
+    "newDonation": "새로운 도네이션!"
+  },
+  "settings": {
+    "title": "설정",
+    "notifications": "알림",
+    "enableDonationSound": "기부 알림 소리 활성화",
+    "appLanguage": "앱 언어",
     "close": "닫기"
   },
   "languages": {

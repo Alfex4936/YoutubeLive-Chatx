@@ -24,6 +24,7 @@
       "running": "RUNNING",
       "stopped": "STOPPED"
     },
+    "topChatters": "Top Chatters",
     "performance": "Performance Metrics",
     "runningTime": "Running Time",
     "minutes": "min",
@@ -37,8 +38,11 @@
       "peakInterval": "Peak 10 second interval",
       "unit": "msg/s"
     },
+    "graphNotAvailable": "Graph not available",
+    "messageGraph": "Message Activity Graph",
+    "recentDonations": "Recent 10 donations",
     "started": "Started:",
-    "topKeywords": "Top Keywords (Recent)",
+    "topKeywords": "Top Keywords (Recent 15m)",
     "filteredLanguages": "Filtered Languages",
     "languageDistribution": "Language Distribution"
   },
@@ -55,6 +59,16 @@
     "id": "ID:",
     "youtube": "@YouTube",
     "clearHistory": "Clear History",
+    "close": "Close"
+  },
+  "donations": {
+    "newDonation": "New donation!"
+  },
+  "settings": {
+    "title": "Settings",
+    "notifications": "Notifications",
+    "enableDonationSound": "Enable donation notification sound",
+    "appLanguage": "App Language",
     "close": "Close"
   },
   "languages": {

@@ -1,0 +1,97 @@
+{
+  "app": {
+    "title": "Analyseur de chat en direct YouTube",
+    "history": "Historique"
+  },
+  "controls": {
+    "title": "Contrôles de l'analyseur",
+    "videoInput": "URL YouTube ou ID de vidéo",
+    "videoPlaceholder": "ex. https://www.youtube.com/watch?v=abc123",
+    "languageFilter": "Filtrer les langues (max 5)",
+    "noLanguagesSelected": "Aucune langue sélectionnée",
+    "selectionsRemaining": "{{count}} sélections restantes",
+    "startAnalyzer": "Démarrer l'analyseur",
+    "starting": "Démarrage...",
+    "stopAnalyzer": "Arrêter l'analyseur",
+    "stopping": "Arrêt en cours..."
+  },
+  "stats": {
+    "title": "Statistiques de l'analyseur",
+    "videoInfo": "Informations sur la diffusion en direct",
+    "vidTitle": "Titre :",
+    "channel": "Chaîne :",
+    "status": {
+      "running": "EN COURS",
+      "stopped": "ARRÊTÉ"
+    },
+    "topChatters": "Meilleurs commentateurs",
+    "performance": "Indicateurs de performance",
+    "runningTime": "Durée d'exécution",
+    "minutes": "min",
+    "totalMessages": "Nombre total de messages",
+    "throughput": {
+      "current": "Actuel (10s)",
+      "average": "Moyenne (10s)",
+      "maximum": "Maximum (10s)",
+      "lastInterval": "Dernier intervalle de 10 secondes",
+      "allIntervals": "Tous les intervalles de 10s",
+      "peakInterval": "Intervalle de 10 secondes de pointe",
+      "unit": "msg/s"
+    },
+    "graphNotAvailable": "Graphique non disponible",
+    "messageGraph": "Graphique d'activité des messages",
+    "recentDonations": "10 derniers dons",
+    "started": "Début :",
+    "topKeywords": "Mots-clés les plus utilisés (récemment 15m)",
+    "filteredLanguages": "Langues filtrées",
+    "languageDistribution": "Répartition des langues"
+  },
+  "messages": {
+    "noData": "Aucune donnée pour cette vidéo pour le moment.",
+    "AnalyzerStarted": "Analyseur démarré.",
+    "AnalyzerStopped": "Analyseur arrêté.",
+    "errorStarting": "Erreur lors du démarrage de l'analyseur",
+    "errorStopping": "Erreur lors de l'arrêt de l'analyseur"
+  },
+  "history": {
+    "title": "Historique des vidéos",
+    "noHistory": "Aucun historique pour le moment",
+    "id": "ID :",
+    "youtube": "@YouTube",
+    "clearHistory": "Effacer l'historique",
+    "close": "Fermer"
+  },
+  "donations": {
+    "newDonation": "Nouveau don!"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "notifications": "Notifications",
+    "enableDonationSound": "Activer le son de notification des dons",
+    "appLanguage": "Langue de l'application",
+    "close": "Fermer"
+  },
+  "languages": {
+    "ENGLISH": "Anglais",
+    "SPANISH": "Espagnol",
+    "FRENCH": "Français",
+    "GERMAN": "Allemand",
+    "KOREAN": "Coréen",
+    "ARABIC": "Arabe",
+    "NYNORSK": "Nynorsk",
+    "DANISH": "Danois",
+    "MAORI": "Maori",
+    "DUTCH": "Néerlandais",
+    "PERSIAN": "Persan",
+    "ESTONIAN": "Estonien",
+    "POLISH": "Polonais",
+    "TAGALOG": "Tagalog",
+    "SWEDISH": "Suédois",
+    "SOMALI": "Somalien",
+    "ALBANIAN": "Albanais",
+    "AZERBAIJANI": "Azerbaïdjanais",
+    "URDU": "Ourdou",
+    "RUSSIAN": "Russe",
+    "CHINESE": "Chinois"
+  }
+}

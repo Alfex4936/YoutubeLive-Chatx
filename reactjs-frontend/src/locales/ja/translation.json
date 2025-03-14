@@ -1,0 +1,97 @@
+{
+  "app": {
+    "title": "YouTubeライブチャットアナライザー",
+    "history": "履歴"
+  },
+  "controls": {
+    "title": "アナライザーコントロール",
+    "videoInput": "YouTube URLまたは動画ID",
+    "videoPlaceholder": "例: https://www.youtube.com/watch?v=abc123",
+    "languageFilter": "言語フィルター (最大5)",
+    "noLanguagesSelected": "言語が選択されていません",
+    "selectionsRemaining": "{{count}} 個の選択が残っています",
+    "startAnalyzer": "アナライザー開始",
+    "starting": "開始中...",
+    "stopAnalyzer": "アナライザー停止",
+    "stopping": "停止中..."
+  },
+  "stats": {
+    "title": "アナライザースタッツ",
+    "videoInfo": "ライブストリーム情報",
+    "vidTitle": "タイトル：",
+    "channel": "チャンネル：",
+    "status": {
+      "running": "実行中",
+      "stopped": "停止済"
+    },
+    "topChatters": "トップチャット参加者",
+    "performance": "パフォーマンス指標",
+    "runningTime": "稼働時間",
+    "minutes": "分",
+    "totalMessages": "メッセージ総数",
+    "throughput": {
+      "current": "現在 (10秒)",
+      "average": "平均 (10秒)",
+      "maximum": "最大 (10秒)",
+      "lastInterval": "直近の10秒間",
+      "allIntervals": "すべての10秒間",
+      "peakInterval": "ピーク時の10秒間",
+      "unit": "メッセージ/秒"
+    },
+    "graphNotAvailable": "グラフが利用できません",
+    "messageGraph": "メッセージアクティビティグラフ",
+    "recentDonations": "最近の寄付 (10件)",
+    "started": "開始時間：",
+    "topKeywords": "人気キーワード (最近 15 分)",
+    "filteredLanguages": "フィルターされた言語",
+    "languageDistribution": "言語の分布"
+  },
+  "messages": {
+    "noData": "この動画のデータはまだありません。",
+    "AnalyzerStarted": "アナライザーが開始されました。",
+    "AnalyzerStopped": "アナライザーが停止されました。",
+    "errorStarting": "アナライザーの開始中にエラーが発生しました",
+    "errorStopping": "アナライザーの停止中にエラーが発生しました"
+  },
+  "history": {
+    "title": "動画履歴",
+    "noHistory": "履歴はまだありません",
+    "id": "ID：",
+    "youtube": "@YouTube",
+    "clearHistory": "履歴をクリア",
+    "close": "閉じる"
+  },
+  "donations": {
+    "newDonation": "新しい寄付!"
+  },
+  "settings": {
+    "title": "設定",
+    "notifications": "通知",
+    "enableDonationSound": "寄付通知音を有効にする",
+    "appLanguage": "アプリの言語",
+    "close": "閉じる"
+  },
+  "languages": {
+    "ENGLISH": "英語",
+    "SPANISH": "スペイン語",
+    "FRENCH": "フランス語",
+    "GERMAN": "ドイツ語",
+    "KOREAN": "韓国語",
+    "ARABIC": "アラビア語",
+    "NYNORSK": "ニーノシュク",
+    "DANISH": "デンマーク語",
+    "MAORI": "マオリ語",
+    "DUTCH": "オランダ語",
+    "PERSIAN": "ペルシア語",
+    "ESTONIAN": "エストニア語",
+    "POLISH": "ポーランド語",
+    "TAGALOG": "タガログ語",
+    "SWEDISH": "スウェーデン語",
+    "SOMALI": "ソマリ語",
+    "ALBANIAN": "アルバニア語",
+    "AZERBAIJANI": "アゼルバイジャン語",
+    "URDU": "ウルドゥー語",
+    "RUSSIAN": "ロシア語",
+    "CHINESE": "中国語"
+  }
+}
