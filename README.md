@@ -54,15 +54,17 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로
     - [x] 30분 동안 메시지 수 차트 그래프
   - [ ] 감정 분석 (긍정 / 부정 / 중립) - local llama3-8b?
   - [ ] 최근 채팅 AI 요약
-- [ ] 소셜 로그인 (OAuth2)
+- [x] 소셜 로그인 (OAuth2)
+  - [x] Google
+  - [ ] Kakao/Naver
 
 ## 테스트 (Testing)
 
 ### Actuator 화면
 ![actuator](https://github.com/user-attachments/assets/57bbf7a0-d88f-406f-993a-366abcc7a5e2)
 
-### Dashboard 화면
-![dashboard](https://github.com/user-attachments/assets/63891103-6d33-45e7-a172-3c5265bd8b1b)
+[//]: # (### Dashboard 화면)
+[//]: # (![dashboard]&#40;https://github.com/user-attachments/assets/63891103-6d33-45e7-a172-3c5265bd8b1b&#41;)
 
 ### 기타 스크린샷
 ![Image](https://github.com/user-attachments/assets/253585cc-5cf1-42bc-8b45-7729e851ad4b)

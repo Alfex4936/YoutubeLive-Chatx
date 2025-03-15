@@ -46,6 +46,10 @@ function App() {
   const previousDonationsRef = useRef([]);
   // Add state for collapsible donations section
   const [showDonations, setShowDonations] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authToken, setAuthToken] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+
 
   // Add state for settings
   const [showSettings, setShowSettings] = useState(false);
@@ -56,8 +60,8 @@ function App() {
 
   // Use the image refresh hook for the graph
   const { i18n } = useTranslation();
-  const graphUrl = videoId ? 
-    `http://localhost:8080/scrapers/messageGraph?videoId=${encodeURIComponent(videoId)}&lang=${i18n.language}` : 
+  const graphUrl = videoId ?
+    `http://localhost:8080/scrapers/messageGraph?videoId=${encodeURIComponent(videoId)}&lang=${i18n.language}` :
     null;
   const refreshedGraphUrl = useImageRefresh(graphUrl, 60000); // Refresh every 60 seconds
 
@@ -71,6 +75,75 @@ function App() {
       setSelectedLangs([...selectedLangs, lang]);
     }
   };
+
+  // Function to fetch user profile
+  const fetchUserProfile = useCallback(async (token) => {
+    try {
+      const response = await fetch('http://localhost:8080/api/v1/users/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUserProfile(userData);
+      } else if (response.status === 401) {
+        handleLogout();
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  }, []);
+
+  // Function to handle login
+  const handleLogin = () => {
+    // Redirect to backend OAuth endpoint
+    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+  };
+
+  // Function to handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setAuthToken(null);
+    setIsAuthenticated(false);
+    setUserProfile(null);
+  };
+
+
+  // Check for token in URL or localStorage on mount
+  useEffect(() => {
+    // Check URL for token parameter (from OAuth redirect)
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('token');
+
+    if (tokenFromUrl) {
+      // Save token to localStorage and state
+      localStorage.setItem('authToken', tokenFromUrl);
+      setAuthToken(tokenFromUrl);
+      setIsAuthenticated(true);
+
+      // Clean URL to remove token parameter and change path from /mypage to /
+      const currentPath = window.location.pathname;
+      if (currentPath.includes('/mypage')) {
+        window.history.replaceState({}, document.title, '/');
+      } else {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      // Fetch user profile with the token
+      fetchUserProfile(tokenFromUrl);
+
+      // Show success message
+      setMessage(t('auth.loginSuccess') || 'Successfully logged in!');
+    } else {
+      // Check localStorage for existing token
+      const storedToken = localStorage.getItem('authToken');
+      if (storedToken) {
+        setAuthToken(storedToken);
+        setIsAuthenticated(true);
+        fetchUserProfile(storedToken);
+      }
+    }
+  }, [fetchUserProfile]);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -235,10 +308,23 @@ function App() {
       }
     })
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+        if (!res.ok) {
+          // If we get a 404, the scraper data is no longer available
+          if (res.status === 404) {
+            setScraperData(null);
+            setIsScraperRunning(false);
+            setPolling(false);
+            // Clear stored videoId to allow starting a new scraper
+            localStorage.removeItem('videoId');
+            return null;
+          }
+          throw new Error(`HTTP error! Status: ${res.status}`);
+        }
         return res.json();
       })
       .then((data) => {
+        if (!data) return; // Skip processing if data is null (from 404 handler)
+
         // Direct response handling - the data is the scraper object itself, not nested in scrapers[videoId]
         if (data && data.videoTitle) {
           setScraperData(data);
@@ -264,6 +350,7 @@ function App() {
           console.error("Stopping polling due to repeated failures.");
           setPolling(false);
           setIsScraperRunning(false);
+          localStorage.removeItem('videoId');
         }
       });
   }, [videoId]);
@@ -349,8 +436,8 @@ function App() {
 
   return (
     <>
-      {/* NAVBAR */}
-      <Navbar bg="dark" variant="dark" className="mb-4">
+      {/* NAVBAR - Removed login/logout buttons */}
+      <Navbar bg="dark" variant="dark" className="mb-4" fixed="top">
         <Container>
           <div className="d-flex justify-content-between align-items-center w-100">
             <div className="invisible">
@@ -361,7 +448,7 @@ function App() {
             </div>
 
             <div className="text-center">
-              <Navbar.Brand className="mb-0">ytChatX</Navbar.Brand>
+              <Navbar.Brand className="mb-0">YTChatX</Navbar.Brand>
               <div
                 className="text-light"
                 style={{ fontSize: '0.70rem', marginTop: '2px' }}
@@ -371,7 +458,6 @@ function App() {
             </div>
 
             <div className="d-flex gap-2">
-              {/* <LanguageSelector /> */}
               <Button
                 variant="outline-light"
                 size="sm"
@@ -391,80 +477,82 @@ function App() {
         </Container>
       </Navbar>
 
-      {/* MAIN CONTAINER */}
-      <Container>
-        {/* SCRAPER CONTROLS CARD */}
-        <Row className="mb-3">
-          <Col md={10} className="mx-auto">
-            <ScraperControlsCard
-              t={t}
-              videoId={videoId}
-              inputValue={inputValue}
-              handleInputChange={handleInputChange}
-              isScraperRunning={isScraperRunning}
-              loading={loading}
-              handleStartScraper={handleStartScraper}
-              handleStopScraper={handleStopScraper}
-              selectedLangs={selectedLangs}
-              handleLanguageSelect={handleLanguageSelect}
-              availableLanguages={availableLanguages}
-            />
-          </Col>
-        </Row>
-
-        {/* DISPLAY MESSAGES */}
-        {message && (
+      {/* Add padding to the top of the container to prevent content from being hidden behind the navbar */}
+      <div style={{ paddingTop: "80px" }}>
+        {/* MAIN CONTAINER */}
+        <Container>
+          {/* SCRAPER CONTROLS CARD */}
           <Row className="mb-3">
             <Col md={10} className="mx-auto">
-              <Alert variant="info">{message}</Alert>
-            </Col>
-          </Row>
-        )}
-
-        {/* Global loading spinner */}
-        {loading && (
-          <Row className="mb-3">
-            <Col className="text-center">
-              <Spinner animation="border" variant="primary" />
-            </Col>
-          </Row>
-        )}
-
-        {/* SCRAPER DATA CARD */}
-        {scraperData ? (
-          <Row>
-            <Col md={10} className="mx-auto">
-              <ScraperDataCard
+              <ScraperControlsCard
                 t={t}
-                scraperData={scraperData}
+                videoId={videoId}
+                inputValue={inputValue}
+                handleInputChange={handleInputChange}
                 isScraperRunning={isScraperRunning}
-                showDonations={showDonations}
-                setShowDonations={setShowDonations}
-                formatTimestamp={formatTimestamp}
+                loading={loading}
+                handleStartScraper={handleStartScraper}
+                handleStopScraper={handleStopScraper}
+                selectedLangs={selectedLangs}
+                handleLanguageSelect={handleLanguageSelect}
+                availableLanguages={availableLanguages}
               />
             </Col>
           </Row>
-        ) : (
-          <Row>
-            <Col md={8} className="mx-auto text-center text-secondary">
-              <p>{t('messages.noData')}</p>
-            </Col>
-          </Row>
-        )}
 
-        {/* Message Graph Section */}
-        {videoId && scraperData && (
-          <Row className="mt-4">
-            <Col md={10} className="mx-auto">
-              <MessageGraphCard
-                t={t}
-                refreshedGraphUrl={refreshedGraphUrl}
-              />
-            </Col>
-          </Row>
-        )}
-      </Container>
+          {/* DISPLAY MESSAGES */}
+          {message && (
+            <Row className="mb-3">
+              <Col md={10} className="mx-auto">
+                <Alert variant="info">{message}</Alert>
+              </Col>
+            </Row>
+          )}
 
+          {/* Global loading spinner */}
+          {loading && (
+            <Row className="mb-3">
+              <Col className="text-center">
+                <Spinner animation="border" variant="primary" />
+              </Col>
+            </Row>
+          )}
+
+          {/* SCRAPER DATA CARD */}
+          {scraperData ? (
+            <Row>
+              <Col md={10} className="mx-auto">
+                <ScraperDataCard
+                  t={t}
+                  scraperData={scraperData}
+                  isScraperRunning={isScraperRunning}
+                  showDonations={showDonations}
+                  setShowDonations={setShowDonations}
+                  formatTimestamp={formatTimestamp}
+                />
+              </Col>
+            </Row>
+          ) : (
+            <Row>
+              <Col md={8} className="mx-auto text-center text-secondary">
+                <p>{t('messages.noData')}</p>
+              </Col>
+            </Row>
+          )}
+
+          {/* Message Graph Section */}
+          {videoId && scraperData && (
+            <Row className="mt-4">
+              <Col md={10} className="mx-auto">
+                <MessageGraphCard
+                  t={t}
+                  refreshedGraphUrl={refreshedGraphUrl}
+                />
+              </Col>
+            </Row>
+          )}
+        </Container>
+      </div>
       <Footer />
 
       {/* Toast Container for Donation Notifications */}
@@ -517,7 +605,7 @@ function App() {
         loadFromHistory={loadFromHistory}
       />
 
-      {/* Settings Modal */}
+      {/* Settings Modal - Added auth-related props */}
       <SettingsModal
         t={t}
         showSettings={showSettings}
@@ -525,6 +613,10 @@ function App() {
         notificationSoundEnabled={notificationSoundEnabled}
         setNotificationSoundEnabled={setNotificationSoundEnabled}
         LanguageSelector={LanguageSelector}
+        isAuthenticated={isAuthenticated}
+        userProfile={userProfile}
+        handleLogin={handleLogin}
+        handleLogout={handleLogout}
       />
 
       {/* Audio element for donation notification */}
