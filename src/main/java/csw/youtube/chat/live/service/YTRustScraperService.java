@@ -194,6 +194,10 @@ public class YTRustScraperService {
                     log.error("Detected scraper failure for video {}. Stopping process.", videoId);
                     stopRustScraper(videoId);
                 }
+                if (line.contains("Scraper encountered")) {
+//                    log.error("No live chat found for video {}.", videoId);
+                    stopRustScraper(videoId);
+                }
             });
         } catch (IOException e) {
             log.error("Error capturing output for {}", videoId, e);

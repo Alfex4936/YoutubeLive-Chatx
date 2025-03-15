@@ -18,6 +18,9 @@ public record UserProfileResponse(
         @Schema(description = "사용자 이메일 주소", example = "user@example.com")
         String email,
 
+        @Schema(description = "사용자의 프로필 사진 URL", example = "https://example.com/profile.jpg")
+        String profilePictureUrl,
+
         @Schema(description = "사용자의 역할", example = "AdminRole")
         String role,
 
@@ -33,6 +36,7 @@ public record UserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getProfilePictureUrl(), // Add this field
                 user.getRole().name(),
                 user.getRole().permissions().stream()
                         .map(Permission::getPermission)

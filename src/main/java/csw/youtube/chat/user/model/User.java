@@ -43,6 +43,9 @@ public class User implements UserDetails {
     @Column(length = 255, nullable = false)
     private String password;
 
+    @Column(length = 500) // Store profile picture URL (OAuth2)
+    private String profilePictureUrl;
+
     //    @Enumerated(EnumType.STRING)
     @Convert(converter = RoleConverter.class)
     private Role role;
