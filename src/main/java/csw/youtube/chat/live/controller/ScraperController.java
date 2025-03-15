@@ -1,6 +1,7 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
+import csw.youtube.chat.common.annotation.RateLimit;
 import csw.youtube.chat.common.util.LocalDater;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.dto.MessagesRequest;
@@ -187,6 +188,7 @@ public class ScraperController {
         return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
     }
 
+    @RateLimit(key = "start-scraper", permitsPerSecond = 1, tolerance = 1000) // 1 req/sec, 1 sec tolerance
     @GetMapping("/start")
     public ResponseEntity<Map<String, String>> startScraper(@RequestParam String videoId,
                                                             @RequestParam(required = false) List<String> langs) {

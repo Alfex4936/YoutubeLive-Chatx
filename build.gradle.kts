@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "csw"
-version = "0.0.1-SNAPSHOT"
+version = "1.0.0"
 
 application {
 	mainClass.set("csw.youtube.chat.Application")

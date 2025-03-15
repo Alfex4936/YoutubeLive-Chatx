@@ -1,8 +1,7 @@
 // src/main.rs
 use anyhow::{Context, Result};
-use chromiumoxide::cdp::browser_protocol::system_info::ProcessInfo;
 use chromiumoxide::{
-    Browser, BrowserConfig, Element, Page,
+    Browser, BrowserConfig, Page,
     detection::{DetectionOptions, default_executable},
     handler::viewport::Viewport,
 };
@@ -16,13 +15,13 @@ use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 // use std::collections::HashMap;
-use std::mem;
+use lasso::ThreadedRodeo;
 use std::sync::Mutex as StdMutex;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
-use sysinfo::{MINIMUM_CPU_UPDATE_INTERVAL, Pid, ProcessesToUpdate, System, get_current_pid};
+use sysinfo::{ProcessesToUpdate, System, get_current_pid};
 use tempfile::tempdir;
 use tokio::{
     sync::Mutex,
@@ -30,12 +29,6 @@ use tokio::{
 };
 
 mod js_scripts;
-
-#[cfg(windows)]
-const MS_EDGE: bool = true;
-
-#[cfg(not(windows))]
-const MS_EDGE: bool = false;
 
 #[derive(Clone, Debug, serde::Serialize)]
 struct ChatMessage {
@@ -164,7 +157,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let client = Client::new();
     let created_at = Utc::now().to_rfc3339();
-    let total_messages = Arc::new(AtomicUsize::new(0));
+    let total_messages = Arc::new(AtomicUsize::new(0)); // assert_eq!(usize::MAX, 18446744073709551615);
     let is_running = Arc::new(AtomicBool::new(true));
 
     // Create circuit breakers for backend communication
@@ -250,8 +243,26 @@ async fn scraper_main_logic(
         .await?;
     page.wait_for_navigation_response().await?;
 
-    wait_for_selector(&page, "iframe#chatframe").await?;
-    let iframe_url = get_iframe_url(&page).await?;
+    // Try to find the chat iframe with proper error handling
+    let iframe_url = match wait_for_selector(&page, "iframe#chatframe").await {
+        Ok(_) => match get_iframe_url(&page).await {
+            Ok(url) => {
+                #[cfg(debug_assertions)]
+                println!("🔗 Found chat iframe URL: {}", url);
+                url
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to get iframe-error URL: {}", e);
+                return Err(anyhow::anyhow!("No live chat available for this video"));
+            }
+        },
+        Err(e) => {
+            eprintln!("❌ Chat iframe-error not found: {}", e);
+            return Err(anyhow::anyhow!("No live chat available for this video"));
+        }
+    };
+
+    // let iframe_url = get_iframe_url(&page).await?;
 
     #[cfg(debug_assertions)]
     println!("🔗 Found chat iframe URL: {}", iframe_url);
@@ -359,11 +370,19 @@ async fn scraper_main_logic(
                     let _ = send_messages_to_backend(&client, &video_id, &batch_clone).await;
                 }
             });
+
+            // Update total_messages atomically
+            total_messages.fetch_add(interval_messages, Ordering::Relaxed);
+
+            #[cfg(debug_assertions)]
+            println!(
+                "Added {} messages, total now: {}",
+                interval_messages,
+                total_messages.load(Ordering::Relaxed)
+            );
         } else {
             consecutive_empty_intervals += 1;
         }
-
-        total_messages.fetch_add(interval_messages, Ordering::Relaxed);
 
         if !is_running.load(Ordering::Relaxed) {
             break;
@@ -780,14 +799,16 @@ async fn handle_chat_events(
         .event_listener::<chromiumoxide::cdp::js_protocol::runtime::EventBindingCalled>()
         .await?;
 
-    // TODO track unique users
-    // NOTE string intern?
+    // Create a thread-safe string interner
+    let interner = ThreadedRodeo::default();
 
     while let Some(event) = events.next().await {
         if event.name == "rustChatHandler" {
             let parts: Vec<&str> = event.payload.split('\t').collect();
             if parts.len() == 2 {
-                let username = parts[0].to_string();
+                // Intern the username - this is very cache-friendly
+                let username_key = interner.get_or_intern(parts[0]);
+                let username = interner.resolve(&username_key).to_string();
                 let message = Cow::Owned(parts[1].to_string());
 
                 // Update chatter counts
