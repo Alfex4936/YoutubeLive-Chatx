@@ -50,7 +50,7 @@ def get_live_video_ids():
         sorted_video_ids = [video_id for video_id, _ in sorted_video_data]
 
         print(f"Total Viewers Watching Live: {total_viewers:,}")
-        return sorted_video_ids[:10]  # Return top 10 videos
+        return sorted_video_ids
 
 
 class ScraperUser(HttpUser):
@@ -84,7 +84,7 @@ class ScraperUser(HttpUser):
 
     def call_scraper_api(self, video_id):
         """Call the /start-scraper API to trigger scrapers for each video ID."""
-        url = f"/scrapers/start-scraper?videoId={video_id}"
+        url = f"/scrapers/start?videoId={video_id}"
         with self.client.get(url, name="Start Scraper", catch_response=True) as response:
             if response.status_code == 302:
                 response.success()

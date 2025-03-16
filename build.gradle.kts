@@ -3,6 +3,7 @@ plugins {
 	application
 	id("org.springframework.boot") version "3.4.3"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("org.graalvm.buildtools.native") version "0.10.6" // GraalVM native image support
 }
 
 group = "csw"
@@ -15,7 +16,8 @@ application {
 		"-Xmx8G", // Set max heap size to 8GB
 		"-XX:+UseZGC", // Use Z Garbage Collector
 		"-XX:+ZGenerational", // Enable Generational ZGC (Java 21+)
-		"-XX:TieredStopAtLevel=1" // Reduce JIT compilation overhead
+		"-XX:TieredStopAtLevel=1", // Reduce JIT compilation overhead
+		"--enable-preview" // Enable Java preview features
 	)
 }
 
@@ -84,4 +86,27 @@ tasks.withType<Test> {
 
 tasks.named<JavaExec>("run") { // "run" is the default task name for application plugin
 	environment["PWDEBUG"] = "1"
+}
+
+// Enable Layered JARs
+tasks.withType<org.springframework.boot.gradle.tasks.bundling.BootJar> {
+	archiveFileName.set("csw-app.jar") // Set custom JAR name
+	launchScript() // Makes the JAR executable
+	layered { // Enables Layered JAR
+		includeTools = true
+	}
+}
+
+// Optimize dependency resolution
+configurations.all {
+	resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+}
+
+// Enable GraalVM native image
+graalvmNative {
+	binaries {
+		named("main") {
+			buildArgs.add("--no-fallback") // Disable Java fallback image
+		}
+	}
 }

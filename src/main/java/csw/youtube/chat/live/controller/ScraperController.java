@@ -52,9 +52,9 @@ public class ScraperController {
         ScraperState.Status newStatus = ScraperState.Status.valueOf(request.status());
         state.setStatus(newStatus);
 
-        int lastThroughput = request.messagesInLastInterval();
+        long lastThroughput = request.messagesInLastInterval();
         state.setLastThroughput(lastThroughput);
-        state.getTotalMessages().addAndGet(lastThroughput);
+        state.getTotalMessages().set(request.totalMessages());
         long intervals = state.getIntervalsCount().incrementAndGet();
         double newAvg = intervals == 1
                 ? lastThroughput
@@ -74,8 +74,7 @@ public class ScraperController {
 
         if (newStatus == ScraperState.Status.IDLE && request.skipLangs() != null) {
             Set<Language> skipLangs = parseLanguages(
-                    request.skipLangs().subList(0, Math.min(5, request.skipLangs().size()))
-            );
+                    request.skipLangs().subList(0, Math.min(5, request.skipLangs().size())));
             state.setSkipLangs(skipLangs);
         }
 
@@ -102,7 +101,8 @@ public class ScraperController {
     }
 
     @GetMapping("/messageGraph")
-    public void getMessageGraph(@RequestParam String videoId, @RequestParam String lang, HttpServletResponse response) throws IOException {
+    public void getMessageGraph(@RequestParam String videoId, @RequestParam String lang, HttpServletResponse response)
+            throws IOException {
         ScraperState state = scraperService.getScraperState(videoId);
         if (state == null || !state.isActiveOrDead()) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -125,9 +125,9 @@ public class ScraperController {
                 "Time",
                 "Message Count",
                 dataset,
-                false,  // Legend
-                true,   // Tooltips
-                false   // URLs
+                false, // Legend
+                true, // Tooltips
+                false // URLs
         );
 
         // Set a proper font for the title (avoid system fallback)
@@ -146,33 +146,33 @@ public class ScraperController {
         XYPlot plot = (XYPlot) chart.getPlot();
         plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
         plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
-        plot.setBackgroundPaint(new Color(240, 240, 240));  // Soft background
+        plot.setBackgroundPaint(new Color(240, 240, 240)); // Soft background
 
         // Set time formatting
         DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
         domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss", locale));
-        domainAxis.setLabelAngle(0);              // No rotation for "Time"
-        domainAxis.setVerticalTickLabels(true);   // Vertical tick labels (timestamps)
+        domainAxis.setLabelAngle(0); // No rotation for "Time"
+        domainAxis.setVerticalTickLabels(true); // Vertical tick labels (timestamps)
 
         // Customize line rendering (thicker line + circular markers)
         XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, true);
         renderer.setSeriesPaint(0, Color.RED);
-        renderer.setSeriesStroke(0, new BasicStroke(2.0f));  // Thicker line
+        renderer.setSeriesStroke(0, new BasicStroke(2.0f)); // Thicker line
         renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-3, -3, 6, 6)); // Circular markers
         plot.setRenderer(renderer);
 
         // Enable tooltips
-//        renderer.setDefaultToolTipGenerator((dataset, series, item) -> {
-//            Instant timestamp = messageCounts.keySet().toArray(new Instant[0])[item];
-//            int count = messageCounts.get(timestamp);
-//            return String.format("Time: %s\nMessages: %d\nWatch: %s", timestamp, count, scraperService.getScraperState(videoId).getVideoUrl());
-//        });
+        // renderer.setDefaultToolTipGenerator((dataset, series, item) -> {
+        // Instant timestamp = messageCounts.keySet().toArray(new Instant[0])[item];
+        // int count = messageCounts.get(timestamp);
+        // return String.format("Time: %s\nMessages: %d\nWatch: %s", timestamp, count,
+        // scraperService.getScraperState(videoId).getVideoUrl());
+        // });
 
         // Write the chart as PNG
         response.setContentType("image/png");
         ChartUtils.writeChartAsPNG(response.getOutputStream(), chart, 1000, 700);
     }
-
 
     @GetMapping("/stop")
     public ResponseEntity<Map<String, String>> stopRustScraper(@RequestParam String videoId) {
@@ -188,10 +188,11 @@ public class ScraperController {
         return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
     }
 
-    @RateLimit(key = "start-scraper", permitsPerSecond = 1, tolerance = 1000) // 1 req/sec, 1 sec tolerance
+    // @RateLimit(key = "start-scraper", permitsPerSecond = 1, tolerance = 1000) //
+    // 1 req/sec, 1 sec tolerance
     @GetMapping("/start")
     public ResponseEntity<Map<String, String>> startScraper(@RequestParam String videoId,
-                                                            @RequestParam(required = false) List<String> langs) {
+            @RequestParam(required = false) List<String> langs) {
         if (langs != null) {
             langs = langs.subList(0, Math.min(5, langs.size()));
         }
@@ -205,7 +206,8 @@ public class ScraperController {
         }
 
         boolean queued = scraperService.startRustScraper(videoId, skipLangs);
-        String message = queued ? "Scraper queued for video " + videoId : "Scraper already running/queued for video " + videoId;
+        String message = queued ? "Scraper queued for video " + videoId
+                : "Scraper already running/queued for video " + videoId;
 
         // Return JSON instead of 302 redirect
         Map<String, String> response = new HashMap<>();
@@ -214,9 +216,9 @@ public class ScraperController {
         return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
     }
 
-
     @GetMapping("/keyword-ranking")
-    public java.util.Set<ZSetOperations.TypedTuple<String>> getKeywords(@RequestParam String videoId, @RequestParam int k) {
+    public java.util.Set<ZSetOperations.TypedTuple<String>> getKeywords(@RequestParam String videoId,
+            @RequestParam int k) {
         return rankingService.getTopKeywords(videoId, k);
     }
 
@@ -256,8 +258,8 @@ public class ScraperController {
                 topLanguages,
                 state.getThreadName(),
                 state.getCreatedAt(),
-                state.getErrorMessage()
-        );
+                state.getFinishedAt(),
+                state.getErrorMessage());
 
         return ResponseEntity.ok(metrics);
     }

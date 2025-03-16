@@ -1,13 +1,16 @@
 package csw.youtube.chat.live.service;
 
-
 import com.github.pemistahl.lingua.api.Language;
 import com.github.pemistahl.lingua.api.LanguageDetector;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
+import csw.youtube.chat.live.dto.SimpleChatMessage;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.RedisKeyCommands;
+import org.springframework.data.redis.connection.RedisZSetCommands;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -30,7 +34,6 @@ public class RankingService {
     private static final int MAX_LANG_RANKINGS = 3; // top 3 langs
     // Expiration time for each video's keyword ranking key, e.g., minutes
     private static final long EXPIRATION_MINUTES = 16L;
-
 
     private final RedisTemplate<String, String> redisTemplate;
     private final LanguageDetector globalLanguageDetector;
@@ -49,7 +52,8 @@ public class RankingService {
 
         if (str.charAt(i) == '-') {
             i++; // Skip negative sign
-            if (i >= len) return false; // "-" alone is not valid
+            if (i >= len)
+                return false; // "-" alone is not valid
         }
 
         while (i < len) {
@@ -58,7 +62,8 @@ public class RankingService {
                 // It's a number
             } else if (c == '.' && !hasDecimal) {
                 hasDecimal = true; // Allow one decimal point
-                if (i + 1 >= len) return false; // "." must be followed by a digit
+                if (i + 1 >= len)
+                    return false; // "." must be followed by a digit
             } else {
                 return false; // Invalid character
             }
@@ -73,7 +78,8 @@ public class RankingService {
     }
 
     /**
-     * Loads ignorable keywords from a file and adds extra English and Korean stop words.
+     * Loads ignorable keywords from a file and adds extra English and Korean stop
+     * words.
      */
     @PostConstruct
     public void initIgnoreKeywords() {
@@ -93,8 +99,10 @@ public class RankingService {
 
         // English stop words.
         ignoreKeywords.addAll(List.of(
-                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-                "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u",
+                "v", "w", "x", "y", "z",
+                "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
+                "V", "W", "X", "Y", "Z",
                 "me", "my", "myself", "we", "our", "ours", "ourselves", "se",
                 "you", "your", "yours", "yourself", "yourselves",
                 "he", "him", "his", "himself", "she", "her", "hers", "herself",
@@ -112,8 +120,7 @@ public class RankingService {
                 "other", "some", "such", "no", "nor", "not", "only", "own", "same",
                 "so", "than", "too", "very", "s", "t", "can", "will", "just", "don",
                 "should", "now", "?", "u", "it's", "they're", "you're", "u're", "ur",
-                "yours", "yours'", "don't", "dont", "~", "...", ".", "yea", "yeah", "ok", "okie", "okay"
-        ));
+                "yours", "yours'", "don't", "dont", "~", "...", ".", "yea", "yeah", "ok", "okie", "okay"));
 
         // Korean stop words.
         ignoreKeywords.addAll(List.of(
@@ -123,26 +130,25 @@ public class RankingService {
                 "하다", "이다", "입니다", "있다", "없다", "그리고", "하지만", "그러나",
                 "때문", "그래서", "만약", "만", "뿐", "의", "를", "은", "는", "이야",
                 "아니", "한", "한번", "많이", "모두", "너", "나", "우리", "또한",
-                "더", "더욱", "아직", "이미", "정말", "저기", "여기", "그곳", "뭐"
-        ));
+                "더", "더욱", "아직", "이미", "정말", "저기", "여기", "그곳", "뭐"));
 
         // French stop words.
         ignoreKeywords.addAll(List.of(
-                "les", "le", "la", "las", "des", "de", "pas", "est"
-        ));
+                "les", "le", "la", "las", "des", "de", "pas", "est"));
 
         log.info("Total ignore keywords count: {}", ignoreKeywords.size());
     }
 
     // TODO time filter?
     /*
-    double timestamp = System.currentTimeMillis() / 1000.0; // Unix timestamp in seconds
-    redisTemplate.opsForZSet().add(key, keyword, timestamp);
-
-    long cutoff = (System.currentTimeMillis() / 1000) - (5 * 60); // Last 5 minutes
-    redisTemplate.opsForZSet().removeRangeByScore(key, 0, cutoff);
-    */
-
+     * double timestamp = System.currentTimeMillis() / 1000.0; // Unix timestamp in
+     * seconds
+     * redisTemplate.opsForZSet().add(key, keyword, timestamp);
+     *
+     * long cutoff = (System.currentTimeMillis() / 1000) - (5 * 60); // Last 5
+     * minutes
+     * redisTemplate.opsForZSet().removeRangeByScore(key, 0, cutoff);
+     */
 
     /**
      * Processes a chat message to update keyword ranking for a video.
@@ -157,7 +163,7 @@ public class RankingService {
 
         // NOTE do I want to skip by words or guess from entire message
         Language detected = globalLanguageDetector.detectLanguageOf(message);
-        // If in skip-langs, skip,  detected == Language.UNKNOWN ||
+        // If in skip-langs, skip, detected == Language.UNKNOWN ||
         if (skipLangs.contains(detected)) {
             // log.debug("Lang {}", detected);
             return;
@@ -169,12 +175,9 @@ public class RankingService {
         // Basic tokenization (consider more robust parsing if needed)
         String[] words = message.split("\\s+");
         for (String word : words) {
-            if (word.codePointCount(0, word.length()) < 3 || isNumeric(word) ||
-                    isSymbolOnly(word) || word.chars().distinct().count() == 1 ||
-                    word.chars().allMatch(ch -> (ch >= 'ㅏ' && ch <= 'ㅣ'))) {
+            if (!isValidWord(word)) {
                 continue;
             }
-
 
             String keyword = word.trim().toLowerCase(); // Locale.Root?
             if (keyword.isEmpty() || ignoreKeywords.contains(keyword)) {
@@ -185,12 +188,71 @@ public class RankingService {
         }
 
         // Trim the sorted set to MAX_KEYWORDS to conserve memory.
-//        Long total = redisTemplate.opsForZSet().size(key);
-//        if (total != null && total > MAX_KEYWORDS) {
-//            redisTemplate.opsForZSet().removeRange(key, 0, total - MAX_KEYWORDS - 1);
-//        }
+        // Long total = redisTemplate.opsForZSet().size(key);
+        // if (total != null && total > MAX_KEYWORDS) {
+        // redisTemplate.opsForZSet().removeRange(key, 0, total - MAX_KEYWORDS - 1);
+        // }
         // Set an expiration time for the keyword ranking key.
         redisTemplate.expire(key, EXPIRATION_MINUTES, TimeUnit.MINUTES);
+    }
+
+    /**
+     * Bulk method to update keyword ranking for many messages at once,
+     * using local aggregation + Redis pipelining for efficiency.
+     */
+    public void updateKeywordRankingBulk(String videoId, List<SimpleChatMessage> messages, Set<Language> skipLangs) {
+        // Pre-aggregate keywords (in-memory) to reduce total Redis commands
+        Map<String, Double> keywordCounts = new HashMap<>();
+
+        for (SimpleChatMessage chatMsg : messages) {
+            String msgText = chatMsg.message();
+            if (msgText == null || msgText.codePointCount(0, msgText.length()) < 3) {
+                continue;
+            }
+
+            // Detect language
+            Language detected = globalLanguageDetector.detectLanguageOf(msgText);
+            if (skipLangs.contains(detected)) {
+                continue;
+            }
+
+            // Basic tokenization
+            // TODO robust parsing message.split("[^\\p{L}\\p{N}'-:]+");
+            String[] words = msgText.split("\\s+");
+            for (String word : words) {
+                if (!isValidWord(word)) {
+                    continue;
+                }
+                String keyword = word.trim().toLowerCase(Locale.ROOT);
+                keywordCounts.merge(keyword, 1.0, Double::sum);
+            }
+        }
+
+        // Pipeline all increments for the current minute
+        long currentMinute = System.currentTimeMillis() / 60000;
+        String key = "video:" + videoId + ":keywords:" + currentMinute;
+
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            RedisZSetCommands zSetCommands = connection.zSetCommands();
+            RedisKeyCommands keyCommands = connection.keyCommands();
+
+            byte[] redisKey = redisTemplate.getStringSerializer().serialize(key);
+            if (redisKey == null)
+                return null;
+
+            // zIncrBy for each unique keyword
+            for (Map.Entry<String, Double> entry : keywordCounts.entrySet()) {
+                byte[] redisValue = redisTemplate.getStringSerializer().serialize(entry.getKey());
+                if (redisValue != null) {
+                    zSetCommands.zIncrBy(redisKey, entry.getValue(), redisValue);
+                }
+            }
+
+            // Set expiration
+            keyCommands.expire(redisKey, EXPIRATION_MINUTES * 60);
+
+            return null; // We're not returning anything from the pipeline
+        });
     }
 
     /**
@@ -218,8 +280,8 @@ public class RankingService {
         redisTemplate.opsForZSet().unionAndStore(keys.getFirst(), keys, tempAggregateKey);
 
         // Fetch top K from the temporary aggregated set
-        Set<ZSetOperations.TypedTuple<String>> topKeywords =
-                redisTemplate.opsForZSet().reverseRangeWithScores(tempAggregateKey, 0, k - 1);
+        Set<ZSetOperations.TypedTuple<String>> topKeywords = redisTemplate.opsForZSet()
+                .reverseRangeWithScores(tempAggregateKey, 0, k - 1);
 
         redisTemplate.delete(tempAggregateKey); // Cleanup temp key immediately
 
@@ -250,15 +312,47 @@ public class RankingService {
             redisTemplate.opsForZSet().removeRange(key, 0, total - MAX_LANG_RANKINGS - 1);
         }
 
-        // Redis TTL 설정 (기본 2시간 유지)
+        // Redis TTL 설정
         redisTemplate.expire(key, EXPIRATION_MINUTES, TimeUnit.MINUTES);
     }
 
+    public void updateLanguageStatsBatch(String videoId, List<String> messages) {
+        if (messages.isEmpty())
+            return;
+
+        // Thread-safe concurrent map
+        ConcurrentHashMap<Language, Integer> languageCounts = new ConcurrentHashMap<>();
+
+        messages.parallelStream()
+                .map(globalLanguageDetector::detectLanguageOf)
+                .filter(lang -> lang != Language.UNKNOWN)  // Skip unknown languages
+                .forEach(lang -> languageCounts.merge(lang, 1, Integer::sum));
+
+        // Then update Redis in a single pipeline
+        String key = "video:" + videoId + ":lang-stats";
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            RedisZSetCommands zSetCommands = connection.zSetCommands();
+            RedisKeyCommands keyCommands = connection.keyCommands();
+
+            int batchMessageCount = 0;
+            for (Map.Entry<Language, Integer> entry : languageCounts.entrySet()) {
+                zSetCommands.zIncrBy(key.getBytes(), entry.getValue(), entry.getKey().toString().getBytes());
+                batchMessageCount += entry.getValue();
+            }
+
+            // Track TOTAL_MESSAGES separately
+            zSetCommands.zIncrBy(key.getBytes(), batchMessageCount, "TOTAL_MESSAGES".getBytes());
+
+            keyCommands.expire(key.getBytes(), TimeUnit.MINUTES.toSeconds(EXPIRATION_MINUTES));
+            return null;
+        });
+    }
+
     /*
-    📌 KOREAN: 80.5% 🟦
-    📌 ENGLISH: 10.2% 🟩
-    📌 JAPANESE: 5.3% 🟥
-    */
+     * 📌 KOREAN: 80.5% 🟦
+     * 📌 ENGLISH: 10.2% 🟩
+     * 📌 JAPANESE: 5.3% 🟥
+     */
     public Map<String, Double> getTopLanguages(String videoId, int topN) {
         String key = "video:" + videoId + ":lang-stats";
 
@@ -269,8 +363,8 @@ public class RankingService {
         }
 
         // 상위 N개 언어 가져오기 (내림차순 정렬)
-        Set<ZSetOperations.TypedTuple<String>> topLangs =
-                redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, topN - 1);
+        Set<ZSetOperations.TypedTuple<String>> topLangs = redisTemplate.opsForZSet().reverseRangeWithScores(key, 0,
+                topN - 1);
 
         // 결과 변환 (언어 -> 비율%)
         Map<String, Double> langStats = new LinkedHashMap<>();
@@ -289,5 +383,25 @@ public class RankingService {
         return langStats;
     }
 
+    /**
+     * Checks if a word is valid for counting:
+     * - not too short
+     * - not numeric
+     * - not all symbols
+     * - not in the ignore list
+     */
+    private boolean isValidWord(String word) {
+        if (word == null) {
+            return false;
+        }
 
+        word = word.trim().toLowerCase(Locale.ROOT);
+
+        return word.codePointCount(0, word.length()) >= 3
+                && !isNumeric(word)
+                && !isSymbolOnly(word)
+                && word.chars().distinct().count() > 1
+                && !word.chars().allMatch(ch -> (ch >= 'ㅏ' && ch <= 'ㅣ'))
+                && !ignoreKeywords.contains(word);
+    }
 }

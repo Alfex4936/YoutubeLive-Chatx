@@ -9,10 +9,10 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RBlockingQueue;
-import org.redisson.api.RSemaphore;
-import org.redisson.api.RedissonClient;
+import org.redisson.api.*;
+import org.redisson.client.protocol.ScoredEntry;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
- * Service for scraping YouTube Live Chat messages for a given video ID using Redis for queueing.
+ * Service for scraping YouTube Live Chat messages for a given video ID using
+ * Redis for queueing.
  */
 @Slf4j
 @Service
@@ -51,6 +52,7 @@ public class YTRustScraperService {
     private final RBlockingQueue<ScraperTask> scraperQueue;
     private final RSemaphore scraperSemaphore;
     private final StringRedisTemplate redisTemplate;
+    private final RedissonClient redisson;
     private volatile boolean isShuttingDown = false;
     private Thread queueProcessorThread;
 
@@ -58,12 +60,13 @@ public class YTRustScraperService {
             ProfanityLogService profanityLogService,
             RankingService rankingService,
             @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
-            RedissonClient redissonClient, StringRedisTemplate redisTemplate) {
+            RedissonClient redissonClient, StringRedisTemplate redisTemplate, RedissonClient redisson) {
         this.profanityLogService = profanityLogService;
         this.rankingService = rankingService;
         this.chatScraperExecutor = chatScraperExecutor;
         this.scraperQueue = redissonClient.getBlockingQueue("scraperQueue");
         this.redisTemplate = redisTemplate;
+        this.redisson = redisson;
         this.scraperQueue.clear();
 
         this.scraperSemaphore = redissonClient.getSemaphore("scraperSemaphore");
@@ -115,30 +118,40 @@ public class YTRustScraperService {
     }
 
     public void processChatMessages(String videoId, List<SimpleChatMessage> messages) {
+        // Store message count stats (in a separate async task)
         chatScraperExecutor.execute(() -> {
             int messageCount = messages.size();
             long now = System.currentTimeMillis();
 
             String key = "video:" + videoId + ":messageCounts";
-
             redisTemplate.opsForZSet().add(key, String.valueOf(messageCount), now);
-            redisTemplate.expire(key, Duration.ofHours(2)); // ✅ Set every time, sliding expiration
+            redisTemplate.expire(key, Duration.ofHours(2)); // sliding expiration
 
             // Remove data older than 1 hour
             long oneHourAgo = now - TimeUnit.HOURS.toMillis(1);
             redisTemplate.opsForZSet().removeRangeByScore(key, 0, oneHourAgo);
         });
 
-        Set<Language> skipLangs = Optional.ofNullable(scraperStates.get(videoId))
-                .map(ScraperState::getSkipLangs)
-                .orElse(Collections.emptySet());
-
-        messages.forEach(message -> {
-            profanityLogService.logIfProfane(message.username(), message.message());
-            chatScraperExecutor.execute(() -> {
-                rankingService.updateLanguageStats(videoId, message.message());
-                rankingService.updateKeywordRanking(videoId, message.message(), skipLangs);
+        chatScraperExecutor.execute(() -> {
+            // Log profanity
+            messages.forEach(message -> {
+                profanityLogService.logIfProfane(message.username(), message.message());
             });
+        });
+
+        // Batch update language stats instead of per-message
+        chatScraperExecutor.execute(() -> {
+            rankingService.updateLanguageStatsBatch(videoId, messages.stream()
+                    .map(SimpleChatMessage::message)
+                    .collect(Collectors.toList()));
+        });
+
+        // Bulk update keyword ranking (the main pipeline improvement)
+        chatScraperExecutor.execute(() -> {
+            Set<Language> skipLangs = Optional.ofNullable(scraperStates.get(videoId))
+                    .map(ScraperState::getSkipLangs)
+                    .orElse(Collections.emptySet());
+            rankingService.updateKeywordRankingBulk(videoId, messages, skipLangs);
         });
     }
 
@@ -163,7 +176,9 @@ public class YTRustScraperService {
 
     public String stopRustScraper(String videoId) {
         var process = activeScrapers.remove(videoId);
-        if (process == null) return "No active scraper found for video ID: " + videoId;
+        if (process == null)
+            return "No active scraper found for video ID: " + videoId;
+
 
         sendCommandToRust(process, "p\n");
         process.onExit().thenRun(() -> log.info("✅ Rust process for video {} exited cleanly.", videoId));
@@ -186,7 +201,8 @@ public class YTRustScraperService {
                 // log.debug("Scraper output for video {}: {}", videoId, line);
 
                 if (line.contains("initiated") && !semaphoreReleased.get()) {
-                    // log.info("Received 'initiated' signal from scraper for video {}. Releasing semaphore.", videoId);
+                    // log.info("Received 'initiated' signal from scraper for video {}. Releasing
+                    // semaphore.", videoId);
                     scraperSemaphore.release();
                     semaphoreReleased.set(true);
                 }
@@ -195,7 +211,7 @@ public class YTRustScraperService {
                     stopRustScraper(videoId);
                 }
                 if (line.contains("Scraper encountered")) {
-//                    log.error("No live chat found for video {}.", videoId);
+                    log.error("No live chat found for video {}.", videoId);
                     stopRustScraper(videoId);
                 }
             });
@@ -284,12 +300,14 @@ public class YTRustScraperService {
 
             // Create an atomic flag to ensure semaphore is released only once.
             AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
-            // Capture output asynchronously and wait for the "initiated" message to release the semaphore.
+            // Capture output asynchronously and wait for the "initiated" message to release
+            // the semaphore.
             Thread.ofVirtual().start(() -> captureProcessOutput(videoId, process, semaphoreReleased));
 
             int exitCode = process.waitFor();
             state.setStatus(exitCode == 0 ? ScraperState.Status.COMPLETED : ScraperState.Status.FAILED);
-            if (exitCode != 0) state.setErrorMessage("Process exited with code " + exitCode);
+            if (exitCode != 0)
+                state.setErrorMessage("Process exited with code " + exitCode);
         } catch (Exception e) {
             log.error("Error running scraper for video {}", videoId, e);
             state.setStatus(ScraperState.Status.FAILED);
@@ -330,6 +348,7 @@ public class YTRustScraperService {
         Optional.ofNullable(scraperStates.get(videoId))
                 .ifPresent(state -> {
                     state.setStatus(ScraperState.Status.COMPLETED);
+                    state.setFinishedAt(Instant.now());
                     state.setErrorMessage("Stopped by user.");
                 });
     }
@@ -339,8 +358,8 @@ public class YTRustScraperService {
         long now = System.currentTimeMillis();
         long minutesAgo = now - 60L * 60_000;
 
-        Set<ZSetOperations.TypedTuple<String>> recentEntries =
-                redisTemplate.opsForZSet().rangeByScoreWithScores(key, minutesAgo, now);
+        Set<ZSetOperations.TypedTuple<String>> recentEntries = redisTemplate.opsForZSet().rangeByScoreWithScores(key,
+                minutesAgo, now);
 
         Map<Instant, Integer> timeCountMap = new TreeMap<>();
         if (recentEntries != null) {
@@ -357,5 +376,4 @@ public class YTRustScraperService {
         // log.info("messageCounts: {}", timeCountMap);
         return timeCountMap;
     }
-
 }

@@ -1,0 +1,1947 @@
+{
+  "cpuUsage": 36.9822119752145,
+  "memUsage": 920,
+  "runningScraperCount": 35,
+  "scrapers": {
+    "qIsPbm2meA8": {
+      "videoTitle": "[LIVE] 채널A 스포츠 \"2025 서울마라톤\"",
+      "channelName": "play 채널A",
+      "videoUrl": "https://www.youtube.com/watch?v=qIsPbm2meA8",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "simon y",
+          "messageCount": 29
+        },
+        {
+          "username": "윤정환",
+          "messageCount": 30
+        },
+        {
+          "username": "천지인",
+          "messageCount": 30
+        },
+        {
+          "username": "K204",
+          "messageCount": 33
+        },
+        {
+          "username": "옥선생",
+          "messageCount": 33
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 16,
+      "maxThroughput": 41,
+      "averageThroughput": 11.890243902439,
+      "totalMessages": 975,
+      "topKeywords": [
+        {
+          "keyword": "13번",
+          "score": 68
+        },
+        {
+          "keyword": "화이팅",
+          "score": 17
+        },
+        {
+          "keyword": "자세는",
+          "score": 17
+        },
+        {
+          "keyword": "아디다스",
+          "score": 16
+        },
+        {
+          "keyword": "대단하다",
+          "score": 15
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 99.1,
+        "DUTCH": 0.4
+      },
+      "threadName": "yt-scraper-4",
+      "createdAt": "2025-03-16T00:54:54.411060900Z"
+    },
+    "oo2WsswGF0c": {
+      "videoTitle": "🔴 CAN I BEAT MINECRAFT WHILE CHAT IS WORKING AGAINST ME?",
+      "channelName": "gray",
+      "videoUrl": "https://www.youtube.com/watch?v=oo2WsswGF0c",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Samantha",
+          "messageCount": 21
+        },
+        {
+          "username": "Bobby Henry",
+          "messageCount": 24
+        },
+        {
+          "username": "Nothing",
+          "messageCount": 24
+        },
+        {
+          "username": "Juanito Alberto",
+          "messageCount": 25
+        },
+        {
+          "username": "Inacio Bevilaqua",
+          "messageCount": 34
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 7,
+      "maxThroughput": 32,
+      "averageThroughput": 11.4683544303797,
+      "totalMessages": 906,
+      "topKeywords": [
+        {
+          "keyword": "tnt",
+          "score": 729
+        },
+        {
+          "keyword": "!crashpc",
+          "score": 59
+        },
+        {
+          "keyword": "sub",
+          "score": 37
+        },
+        {
+          "keyword": "water",
+          "score": 18
+        },
+        {
+          "keyword": "subbed",
+          "score": 6
+        }
+      ],
+      "topLanguages": {
+        "VIETNAMESE": 74.6,
+        "SWAHILI": 7.1
+      },
+      "threadName": "yt-scraper-61",
+      "createdAt": "2025-03-16T00:55:20.490362400Z"
+    },
+    "oDe-TMwOLR8": {
+      "videoTitle": "2025 IMSA Twelve Hours of Sebring | PART 2 | WeatherTech SportsCar Championship | Sebring, FL",
+      "channelName": "IMSA Official",
+      "videoUrl": "https://www.youtube.com/watch?v=oDe-TMwOLR8",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Duv Jones",
+          "messageCount": 19
+        },
+        {
+          "username": "Collin Randall",
+          "messageCount": 20
+        },
+        {
+          "username": "ianik1984",
+          "messageCount": 20
+        },
+        {
+          "username": "Aitch",
+          "messageCount": 21
+        },
+        {
+          "username": "IMSA Official",
+          "messageCount": 24
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 6,
+      "maxThroughput": 252,
+      "averageThroughput": 10.5375,
+      "totalMessages": 843,
+      "topKeywords": [
+        {
+          "keyword": "rexy",
+          "score": 100
+        },
+        {
+          "keyword": "ferrari",
+          "score": 50
+        },
+        {
+          "keyword": "@imsa",
+          "score": 36
+        },
+        {
+          "keyword": "official",
+          "score": 34
+        },
+        {
+          "keyword": "lets",
+          "score": 32
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 45.1,
+        "TAGALOG": 5.6
+      },
+      "threadName": "yt-scraper-8",
+      "createdAt": "2025-03-16T00:55:07.828214600Z"
+    },
+    "3tjhN0R_beU": {
+      "videoTitle": "[🔴LIVE] 야인시대 폭8!!! 25년 N회차 라이브!! 리마스터링 고화질 ver.",
+      "channelName": "BBACKDRA - SBS OLD DRAMA",
+      "videoUrl": "https://www.youtube.com/watch?v=3tjhN0R_beU",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "날좀보송",
+          "messageCount": 12
+        },
+        {
+          "username": "모씨모씨",
+          "messageCount": 12
+        },
+        {
+          "username": "창술의신 고돌발",
+          "messageCount": 12
+        },
+        {
+          "username": "Peanut",
+          "messageCount": 13
+        },
+        {
+          "username": "유현옥",
+          "messageCount": 19
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 18,
+      "maxThroughput": 27,
+      "averageThroughput": 8.22784810126582,
+      "totalMessages": 650,
+      "topKeywords": [
+        {
+          "keyword": "손흥민",
+          "score": 17
+        },
+        {
+          "keyword": "신마적",
+          "score": 15
+        },
+        {
+          "keyword": "또깨동무",
+          "score": 10
+        },
+        {
+          "keyword": "구마적",
+          "score": 10
+        },
+        {
+          "keyword": "흥민이",
+          "score": 9
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 98.8,
+        "TSONGA": 0.3
+      },
+      "threadName": "yt-scraper-62",
+      "createdAt": "2025-03-16T00:55:20.505240300Z"
+    },
+    "miYCiAfcyyM": {
+      "videoTitle": "파면후 대한민국 운세,  신천지 통일교, 검찰, 사법부(저작권침해시 고발)",
+      "channelName": "시사져널 점성학 타로 Cecil",
+      "videoUrl": "https://www.youtube.com/watch?v=miYCiAfcyyM",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "아들셋맘",
+          "messageCount": 10
+        },
+        {
+          "username": "잘살아보세",
+          "messageCount": 10
+        },
+        {
+          "username": "명태균특검가자",
+          "messageCount": 11
+        },
+        {
+          "username": "임은진",
+          "messageCount": 11
+        },
+        {
+          "username": "°공기의요정 °",
+          "messageCount": 20
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 11,
+      "maxThroughput": 15,
+      "averageThroughput": 6.77333333333333,
+      "totalMessages": 508,
+      "topKeywords": [
+        {
+          "keyword": "민영화",
+          "score": 31
+        },
+        {
+          "keyword": "안녕하세요",
+          "score": 28
+        },
+        {
+          "keyword": "맞아요",
+          "score": 15
+        },
+        {
+          "keyword": "세실님",
+          "score": 14
+        },
+        {
+          "keyword": "대통령",
+          "score": 12
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 97.8,
+        "TSWANA": 1
+      },
+      "threadName": "yt-scraper-394",
+      "createdAt": "2025-03-16T00:55:54.992994500Z"
+    },
+    "FJfwehhzIhw": {
+      "videoTitle": "[LIVE] 대한민국 24시간 뉴스채널 YTN",
+      "channelName": "YTN",
+      "videoUrl": "https://www.youtube.com/watch?v=FJfwehhzIhw",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Qq",
+          "messageCount": 46
+        },
+        {
+          "username": "Ŵ",
+          "messageCount": 47
+        },
+        {
+          "username": "비타민C",
+          "messageCount": 51
+        },
+        {
+          "username": "정의의 여신",
+          "messageCount": 51
+        },
+        {
+          "username": "파랑새",
+          "messageCount": 55
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 6,
+      "maxThroughput": 11,
+      "averageThroughput": 6.26582278481013,
+      "totalMessages": 495,
+      "topKeywords": [
+        {
+          "keyword": "계엄뻘짓",
+          "score": 46
+        },
+        {
+          "keyword": "폐지하라",
+          "score": 36
+        },
+        {
+          "keyword": "나라개판",
+          "score": 22
+        },
+        {
+          "keyword": "지지하시는",
+          "score": 21
+        },
+        {
+          "keyword": "족속들이신지~!!",
+          "score": 21
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 88.5,
+        "SOTHO": 2.2
+      },
+      "threadName": "yt-scraper-60",
+      "createdAt": "2025-03-16T00:55:20.247893600Z"
+    },
+    "VkYZ7EA9F6U": {
+      "videoTitle": "[독고다이 LIVE🔴03.16]리니지M \"총사\" 에가쟁 가디언투구 득~깔끔하게 마무리! #불도그#수삼티비#빅보스#리니지M#RF온라인",
+      "channelName": "독고다이",
+      "videoUrl": "https://www.youtube.com/watch?v=VkYZ7EA9F6U",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "오박이",
+          "messageCount": 19
+        },
+        {
+          "username": "조부들부들",
+          "messageCount": 23
+        },
+        {
+          "username": "푸른바람",
+          "messageCount": 25
+        },
+        {
+          "username": "SeongYeol Lee",
+          "messageCount": 26
+        },
+        {
+          "username": "안현",
+          "messageCount": 32
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 1,
+      "maxThroughput": 34,
+      "averageThroughput": 6.17073170731707,
+      "totalMessages": 506,
+      "topKeywords": [
+        {
+          "keyword": "ㅈㅅㅇ",
+          "score": 42
+        },
+        {
+          "keyword": "수삼업",
+          "score": 15
+        },
+        {
+          "keyword": "100마리",
+          "score": 12
+        },
+        {
+          "keyword": "치킨업",
+          "score": 10
+        },
+        {
+          "keyword": "독고업",
+          "score": 10
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 99.2,
+        "NYNORSK": 0.4
+      },
+      "threadName": "yt-scraper-0",
+      "createdAt": "2025-03-16T00:54:54.411768300Z"
+    },
+    "jZFY1bSyBMs": {
+      "videoTitle": "“처참한 상황”..두 달 새 20만 ‘줄폐업’ 충격, 악재의 연속..관광지도 번화가도 속수무책-[핫이슈PLAY] MBC뉴스 2025년 3월 16일",
+      "channelName": "MBCNEWS",
+      "videoUrl": "https://www.youtube.com/watch?v=jZFY1bSyBMs",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "남자이의철",
+          "messageCount": 14
+        },
+        {
+          "username": "초롱이",
+          "messageCount": 14
+        },
+        {
+          "username": "주옥순",
+          "messageCount": 15
+        },
+        {
+          "username": "가우수",
+          "messageCount": 17
+        },
+        {
+          "username": "Victor Gruen",
+          "messageCount": 27
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 5,
+      "maxThroughput": 14,
+      "averageThroughput": 5.06172839506173,
+      "totalMessages": 410,
+      "topKeywords": [
+        {
+          "keyword": "일어나지",
+          "score": 14
+        },
+        {
+          "keyword": "은행강도는",
+          "score": 14
+        },
+        {
+          "keyword": "않았는데",
+          "score": 14
+        },
+        {
+          "keyword": "아무일도",
+          "score": 14
+        },
+        {
+          "keyword": ":folded_hands:",
+          "score": 11
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 99.5,
+        "VIETNAMESE": 0.2
+      },
+      "threadName": "yt-scraper-7",
+      "createdAt": "2025-03-16T00:55:07.038663100Z"
+    },
+    "wz3x2YPxo40": {
+      "videoTitle": "Louisville vs Duke LIVE HD Today | NCAA Men's College Basketball 2025",
+      "channelName": "Love Music",
+      "videoUrl": "https://www.youtube.com/watch?v=wz3x2YPxo40",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Donnie Wathen",
+          "messageCount": 14
+        },
+        {
+          "username": "Sauce Savvy",
+          "messageCount": 15
+        },
+        {
+          "username": "Ducky",
+          "messageCount": 17
+        },
+        {
+          "username": "Juju Bean",
+          "messageCount": 20
+        },
+        {
+          "username": "Dylan",
+          "messageCount": 21
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 5,
+      "maxThroughput": 14,
+      "averageThroughput": 4.4390243902439,
+      "totalMessages": 364,
+      "topKeywords": [
+        {
+          "keyword": "duke",
+          "score": 48
+        },
+        {
+          "keyword": "cooper",
+          "score": 16
+        },
+        {
+          "keyword": "lol",
+          "score": 15
+        },
+        {
+          "keyword": "louisville",
+          "score": 13
+        },
+        {
+          "keyword": "kentucky",
+          "score": 12
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 50.8,
+        "BOKMAL": 4
+      },
+      "threadName": "yt-scraper-3",
+      "createdAt": "2025-03-16T00:54:54.406375500Z"
+    },
+    "iP4WKm_TPvA": {
+      "videoTitle": "월 수익 ‘100만원 미만’ 개인사업자 900만 명..꽉 닫힌 ‘지갑’ 이유는? - [현장PLAY] MBC뉴스 2025년 3월 16일",
+      "channelName": "MBCNEWS",
+      "videoUrl": "https://www.youtube.com/watch?v=iP4WKm_TPvA",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "레디고고",
+          "messageCount": 17
+        },
+        {
+          "username": "아몰라",
+          "messageCount": 17
+        },
+        {
+          "username": "처음처럼",
+          "messageCount": 19
+        },
+        {
+          "username": "박만식",
+          "messageCount": 26
+        },
+        {
+          "username": "CA",
+          "messageCount": 42
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 10,
+      "averageThroughput": 4.13157894736842,
+      "totalMessages": 314,
+      "topKeywords": [
+        {
+          "keyword": "이재명",
+          "score": 34
+        },
+        {
+          "keyword": "한마리때문에",
+          "score": 27
+        },
+        {
+          "keyword": "난리여~~",
+          "score": 27
+        },
+        {
+          "keyword": "미얀마",
+          "score": 19
+        },
+        {
+          "keyword": "윤석열",
+          "score": 12
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 99.7,
+        "GANDA": 0.3
+      },
+      "threadName": "yt-scraper-370",
+      "createdAt": "2025-03-16T00:55:51.210670900Z"
+    },
+    "T5JIjpYdZs0": {
+      "videoTitle": "가면 써도 찾아낸다..순식간에 ‘나락’?, 수익몰수 ‘덜덜’..“악질 행태” 분노의 청원 - [핫이슈PLAY] MBC뉴스 2025년 03월 15일",
+      "channelName": "MBCNEWS",
+      "videoUrl": "https://www.youtube.com/watch?v=T5JIjpYdZs0",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "김영화",
+          "messageCount": 12
+        },
+        {
+          "username": "따슈웡",
+          "messageCount": 14
+        },
+        {
+          "username": "김성환",
+          "messageCount": 21
+        },
+        {
+          "username": "지니",
+          "messageCount": 25
+        },
+        {
+          "username": "pqisjshegg",
+          "messageCount": 31
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 4,
+      "maxThroughput": 8,
+      "averageThroughput": 3.01234567901235,
+      "totalMessages": 244,
+      "topKeywords": [
+        {
+          "keyword": "고시원",
+          "score": 15
+        },
+        {
+          "keyword": "김영화",
+          "score": 12
+        },
+        {
+          "keyword": "코헬렛",
+          "score": 10
+        },
+        {
+          "keyword": "지니야",
+          "score": 8
+        },
+        {
+          "keyword": "가세연",
+          "score": 8
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 98.8,
+        "FINNISH": 0.4
+      },
+      "threadName": "yt-scraper-6",
+      "createdAt": "2025-03-16T00:55:06.670313700Z"
+    },
+    "XiD9jd9n-LU": {
+      "videoTitle": "\"어퍼컷 조마조마\" “尹 딛고가나 업고가나”, “헌재는 다 계획이..” 尹 행보에 불길한 보수 - [핫이슈PLAY] MBC뉴스 2025년 03월 15일",
+      "channelName": "MBCNEWS",
+      "videoUrl": "https://www.youtube.com/watch?v=XiD9jd9n-LU",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "보미",
+          "messageCount": 13
+        },
+        {
+          "username": "이준석 화이팅 !",
+          "messageCount": 15
+        },
+        {
+          "username": "수수꽃다리",
+          "messageCount": 21
+        },
+        {
+          "username": "신두환",
+          "messageCount": 21
+        },
+        {
+          "username": "정의준",
+          "messageCount": 21
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 3,
+      "maxThroughput": 7,
+      "averageThroughput": 2.83950617283951,
+      "totalMessages": 230,
+      "topKeywords": [
+        {
+          "keyword": "판결을",
+          "score": 59
+        },
+        {
+          "keyword": "헌재의",
+          "score": 57
+        },
+        {
+          "keyword": "한다.",
+          "score": 38
+        },
+        {
+          "keyword": "있다.",
+          "score": 38
+        },
+        {
+          "keyword": "믿겠는가?",
+          "score": 38
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 99.1,
+        "TSONGA": 0.4
+      },
+      "threadName": "yt-scraper-9",
+      "createdAt": "2025-03-16T00:55:07.834904300Z"
+    },
+    "Obsv3UPbVzw": {
+      "videoTitle": "[🔴LIVE] 【올끌】 #무한도전 주말 60시간 라이브스트리밍🔥🔥",
+      "channelName": "올끌 (All of MBClassic)",
+      "videoUrl": "https://www.youtube.com/watch?v=Obsv3UPbVzw",
+      "status": "RUNNING",
+      "runningTimeMinutes": 11,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "[후버지]윤태진포에버",
+          "messageCount": 8
+        },
+        {
+          "username": "무도bot",
+          "messageCount": 8
+        },
+        {
+          "username": "맹꽁이",
+          "messageCount": 12
+        },
+        {
+          "username": "G지용",
+          "messageCount": 19
+        },
+        {
+          "username": "청개구리",
+          "messageCount": 36
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 7,
+      "averageThroughput": 2.22222222222222,
+      "totalMessages": 160,
+      "topKeywords": [
+        {
+          "keyword": "청개구리",
+          "score": 10
+        },
+        {
+          "keyword": "g지용",
+          "score": 6
+        },
+        {
+          "keyword": "짱구는힘들다",
+          "score": 5
+        },
+        {
+          "keyword": "투투닭",
+          "score": 3
+        },
+        {
+          "keyword": "출석,",
+          "score": 3
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 96.9,
+        "TSONGA": 0.6
+      },
+      "threadName": "yt-scraper-890",
+      "createdAt": "2025-03-16T00:56:24.999615100Z"
+    },
+    "L4nHQzTb6Z8": {
+      "videoTitle": "New York Knicks @ Golden State Warriors | NBA on ABC Live Scoreboard",
+      "channelName": "NBA",
+      "videoUrl": "https://www.youtube.com/watch?v=L4nHQzTb6Z8",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Ethan Yosua",
+          "messageCount": 7
+        },
+        {
+          "username": "planetnavyblue",
+          "messageCount": 23
+        },
+        {
+          "username": "NOVA ™",
+          "messageCount": 24
+        },
+        {
+          "username": "The Autism Boy COTTAGE81",
+          "messageCount": 24
+        },
+        {
+          "username": "TYRESE HALLIBURTON",
+          "messageCount": 32
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 3,
+      "maxThroughput": 5,
+      "averageThroughput": 1.97297297297297,
+      "totalMessages": 146,
+      "topKeywords": [
+        {
+          "keyword": "halliburton",
+          "score": 15
+        },
+        {
+          "keyword": "@tyrese",
+          "score": 15
+        },
+        {
+          "keyword": "game",
+          "score": 11
+        },
+        {
+          "keyword": "playoffs",
+          "score": 10
+        },
+        {
+          "keyword": "yes",
+          "score": 9
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 51.8,
+        "ALBANIAN": 9.9
+      },
+      "threadName": "yt-scraper-685",
+      "createdAt": "2025-03-16T00:56:11.494616600Z"
+    },
+    "DMQJz4a7njA": {
+      "videoTitle": "롤) 실버를 왜 못가",
+      "channelName": "브마장",
+      "videoUrl": "https://www.youtube.com/watch?v=DMQJz4a7njA",
+      "status": "RUNNING",
+      "runningTimeMinutes": 11,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "레빌이",
+          "messageCount": 5
+        },
+        {
+          "username": "자자",
+          "messageCount": 5
+        },
+        {
+          "username": "아쿠아마륀",
+          "messageCount": 6
+        },
+        {
+          "username": "라마시아 야말",
+          "messageCount": 10
+        },
+        {
+          "username": "아니",
+          "messageCount": 17
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 2,
+      "maxThroughput": 6,
+      "averageThroughput": 1.01388888888889,
+      "totalMessages": 73,
+      "topKeywords": [
+        {
+          "keyword": "젤좋음",
+          "score": 2
+        },
+        {
+          "keyword": "우디르",
+          "score": 2
+        },
+        {
+          "keyword": "와드는",
+          "score": 2
+        },
+        {
+          "keyword": "아니라",
+          "score": 2
+        },
+        {
+          "keyword": "시야가",
+          "score": 2
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 100
+      },
+      "threadName": "yt-scraper-1063",
+      "createdAt": "2025-03-16T00:56:28.506860700Z"
+    },
+    "YvOgGsOmalk": {
+      "videoTitle": "PUSHING TOP 50 NO LOSSES",
+      "channelName": "Innvader",
+      "videoUrl": "https://www.youtube.com/watch?v=YvOgGsOmalk",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "zilong",
+          "messageCount": 3
+        },
+        {
+          "username": "99bkking",
+          "messageCount": 4
+        },
+        {
+          "username": "aniket rawat",
+          "messageCount": 4
+        },
+        {
+          "username": "Tyler Marshal",
+          "messageCount": 5
+        },
+        {
+          "username": "AdityaPlaysBS",
+          "messageCount": 7
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 1,
+      "maxThroughput": 6,
+      "averageThroughput": 0.922077922077923,
+      "totalMessages": 71,
+      "topKeywords": [
+        {
+          "keyword": "bro",
+          "score": 6
+        },
+        {
+          "keyword": "think",
+          "score": 4
+        },
+        {
+          "keyword": "pay",
+          "score": 4
+        },
+        {
+          "keyword": "iman",
+          "score": 4
+        },
+        {
+          "keyword": "crazy",
+          "score": 4
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 43.7,
+        "TSONGA": 5.6
+      },
+      "threadName": "yt-scraper-188",
+      "createdAt": "2025-03-16T00:55:37.693679200Z"
+    },
+    "lDcWeklf6DI": {
+      "videoTitle": "[🔴LIVE] 🏃‍♂️런닝맨 몰아보기🏃‍♂️ | 📺스브스 런닝맨 실시간 스트리밍📢",
+      "channelName": "SBS Running Man",
+      "videoUrl": "https://www.youtube.com/watch?v=lDcWeklf6DI",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "벤쉬",
+          "messageCount": 4
+        },
+        {
+          "username": "엉클조쉬",
+          "messageCount": 4
+        },
+        {
+          "username": "정승호",
+          "messageCount": 7
+        },
+        {
+          "username": "뚜뚜",
+          "messageCount": 12
+        },
+        {
+          "username": "퓨바오랑같은푸쒸",
+          "messageCount": 19
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 3,
+      "averageThroughput": 0.666666666666667,
+      "totalMessages": 54,
+      "topKeywords": [
+        {
+          "keyword": "할머니",
+          "score": 3
+        },
+        {
+          "keyword": "박지현",
+          "score": 3
+        },
+        {
+          "keyword": "네덜란드",
+          "score": 3
+        },
+        {
+          "keyword": "소민이",
+          "score": 2
+        },
+        {
+          "keyword": "한선화",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 100
+      },
+      "threadName": "yt-scraper-63",
+      "createdAt": "2025-03-16T00:55:20.716509700Z"
+    },
+    "EeGGwLMuSVc": {
+      "videoTitle": "[🔴이슈] \"화가 나서\" 경기 시흥 편의점 직원 살해…보복 범죄로 드러나/2025년 3월 16일(일)/KBS",
+      "channelName": "KBS News",
+      "videoUrl": "https://www.youtube.com/watch?v=EeGGwLMuSVc",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Back Dark",
+          "messageCount": 6
+        },
+        {
+          "username": "CA",
+          "messageCount": 2
+        },
+        {
+          "username": "독도는대한민국",
+          "messageCount": 25
+        },
+        {
+          "username": "아 아",
+          "messageCount": 1
+        },
+        {
+          "username": "돌쇠엔가마니 (갸샤꺄)",
+          "messageCount": 9
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 3,
+      "averageThroughput": 0.48314606741573,
+      "totalMessages": 43,
+      "topKeywords": [
+        {
+          "keyword": "호신이",
+          "score": 1
+        },
+        {
+          "keyword": "호신용품.",
+          "score": 1
+        },
+        {
+          "keyword": "해줘라",
+          "score": 1
+        },
+        {
+          "keyword": "해결될",
+          "score": 1
+        },
+        {
+          "keyword": "할말이",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 100
+      },
+      "threadName": "yt-scraper-203",
+      "createdAt": "2025-03-16T00:55:39.692074800Z"
+    },
+    "gLsAKopMmXI": {
+      "videoTitle": "🔴WARRIORS vs KNICKS │ 2025 NBA Basketball Game Play-By-Play Reaction & Scoreboard",
+      "channelName": "Sports Manda",
+      "videoUrl": "https://www.youtube.com/watch?v=gLsAKopMmXI",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "German Panganiban",
+          "messageCount": 2
+        },
+        {
+          "username": "Winston Abraham Espina",
+          "messageCount": 2
+        },
+        {
+          "username": "Yielle Delacruz",
+          "messageCount": 2
+        },
+        {
+          "username": "burhan tugue",
+          "messageCount": 2
+        },
+        {
+          "username": "La bobo",
+          "messageCount": 4
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 3,
+      "averageThroughput": 0.285714285714286,
+      "totalMessages": 28,
+      "topKeywords": [
+        {
+          "keyword": "morning",
+          "score": 6
+        },
+        {
+          "keyword": "lakers",
+          "score": 6
+        },
+        {
+          "keyword": "ang",
+          "score": 5
+        },
+        {
+          "keyword": "tol.",
+          "score": 4
+        },
+        {
+          "keyword": "shoutout..:hand-pink-waving:",
+          "score": 4
+        }
+      ],
+      "topLanguages": {
+        "TAGALOG": 42.9,
+        "ENGLISH": 25
+      },
+      "threadName": "yt-scraper-5",
+      "createdAt": "2025-03-16T00:55:05.707383800Z"
+    },
+    "0tkmgwVwE1g": {
+      "videoTitle": "2025.3.16(일) [깝도이] 스타 빨무 팀플",
+      "channelName": "깝도이",
+      "videoUrl": "https://www.youtube.com/watch?v=0tkmgwVwE1g",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "리트리버어흥",
+          "messageCount": 1
+        },
+        {
+          "username": "무우도사배추도사",
+          "messageCount": 1
+        },
+        {
+          "username": "톰쿠르즈",
+          "messageCount": 1
+        },
+        {
+          "username": "명장",
+          "messageCount": 2
+        },
+        {
+          "username": "윤명근",
+          "messageCount": 2
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 1,
+      "maxThroughput": 2,
+      "averageThroughput": 0.279069767441861,
+      "totalMessages": 24,
+      "topKeywords": [
+        {
+          "keyword": "안녕하세요",
+          "score": 4
+        },
+        {
+          "keyword": "도이님",
+          "score": 3
+        },
+        {
+          "keyword": "굿모닝입니다",
+          "score": 3
+        },
+        {
+          "keyword": "하고싶다ㅋ",
+          "score": 2
+        },
+        {
+          "keyword": "도이형이랑",
+          "score": 2
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 91.7,
+        "TSWANA": 4.2
+      },
+      "threadName": "yt-scraper-684",
+      "createdAt": "2025-03-16T00:56:11.506500500Z"
+    },
+    "9ZWu4o8brMw": {
+      "videoTitle": "Travel to 30000000 blocks #minecraftshorts #asmr",
+      "channelName": "さむ",
+      "videoUrl": "https://www.youtube.com/watch?v=9ZWu4o8brMw",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Boots Lethal",
+          "messageCount": 2
+        },
+        {
+          "username": "BuddyHolly",
+          "messageCount": 2
+        },
+        {
+          "username": "Doughy",
+          "messageCount": 2
+        },
+        {
+          "username": "Patrick Bateman",
+          "messageCount": 3
+        },
+        {
+          "username": "Supersonic.E",
+          "messageCount": 4
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 2,
+      "averageThroughput": 0.278350515463918,
+      "totalMessages": 27,
+      "topKeywords": [
+        {
+          "keyword": "still",
+          "score": 2
+        },
+        {
+          "keyword": "name",
+          "score": 2
+        },
+        {
+          "keyword": "mod",
+          "score": 2
+        },
+        {
+          "keyword": "make",
+          "score": 2
+        },
+        {
+          "keyword": "life",
+          "score": 2
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 45.5,
+        "AFRIKAANS": 9.1
+      },
+      "threadName": "yt-scraper-306",
+      "createdAt": "2025-03-16T00:55:47.386720900Z"
+    },
+    "zID_hzmnEpE": {
+      "videoTitle": "Golden State Warriors vs New York Knicks NBA Live Scoreboard",
+      "channelName": "BL Football Talks",
+      "videoUrl": "https://www.youtube.com/watch?v=zID_hzmnEpE",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Unknown Legend",
+          "messageCount": 1
+        },
+        {
+          "username": "mushida Talley",
+          "messageCount": 2
+        },
+        {
+          "username": "Quincy Jones",
+          "messageCount": 3
+        },
+        {
+          "username": "scott shinthant",
+          "messageCount": 3
+        },
+        {
+          "username": "Uno",
+          "messageCount": 7
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 1,
+      "maxThroughput": 2,
+      "averageThroughput": 0.237113402061856,
+      "totalMessages": 23,
+      "topKeywords": [
+        {
+          "keyword": "let's",
+          "score": 7
+        },
+        {
+          "keyword": "jimmy",
+          "score": 6
+        },
+        {
+          "keyword": "steph",
+          "score": 5
+        },
+        {
+          "keyword": "get",
+          "score": 3
+        },
+        {
+          "keyword": "way",
+          "score": 2
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 43.5,
+        "YORUBA": 4.3
+      },
+      "threadName": "yt-scraper-351",
+      "createdAt": "2025-03-16T00:55:50.184Z"
+    },
+    "WqkNbJ-ET2A": {
+      "videoTitle": "로블 시참 + 입양 거래 [Roblox]",
+      "channelName": "KOBUKE_TV",
+      "videoUrl": "https://www.youtube.com/watch?v=WqkNbJ-ET2A",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Miseon Kim",
+          "messageCount": 1
+        },
+        {
+          "username": "뉴벵이",
+          "messageCount": 1
+        },
+        {
+          "username": "강경점",
+          "messageCount": 3
+        },
+        {
+          "username": "로블계",
+          "messageCount": 5
+        },
+        {
+          "username": "이도윤",
+          "messageCount": 5
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 2,
+      "averageThroughput": 0.202127659574468,
+      "totalMessages": 19,
+      "topKeywords": [
+        {
+          "keyword": "안녕하세요",
+          "score": 2
+        },
+        {
+          "keyword": "친추안돼나요?",
+          "score": 1
+        },
+        {
+          "keyword": "친추받아주세여",
+          "score": 1
+        },
+        {
+          "keyword": "죄송한데",
+          "score": 1
+        },
+        {
+          "keyword": "있으신가요?",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 88.9,
+        "GANDA": 5.6
+      },
+      "threadName": "yt-scraper-565",
+      "createdAt": "2025-03-16T00:56:06.588986600Z"
+    },
+    "_19muHbCVSE": {
+      "videoTitle": "Milwaukee Bucks vs Indiana Pacers NBA Live Scoreboard",
+      "channelName": "BL Football Talks",
+      "videoUrl": "https://www.youtube.com/watch?v=_19muHbCVSE",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Leblanc Matthew",
+          "messageCount": 1
+        },
+        {
+          "username": "miaheatfan",
+          "messageCount": 1
+        },
+        {
+          "username": "Rell2Sturdy",
+          "messageCount": 2
+        },
+        {
+          "username": "C Sc",
+          "messageCount": 3
+        },
+        {
+          "username": "ShellySan_",
+          "messageCount": 5
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 2,
+      "averageThroughput": 0.195402298850575,
+      "totalMessages": 17,
+      "topKeywords": [
+        {
+          "keyword": "assist",
+          "score": 5
+        },
+        {
+          "keyword": "win",
+          "score": 3
+        },
+        {
+          "keyword": "need",
+          "score": 3
+        },
+        {
+          "keyword": "hali",
+          "score": 3
+        },
+        {
+          "keyword": "half",
+          "score": 3
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 70.6,
+        "TSWANA": 11.8
+      },
+      "threadName": "yt-scraper-371",
+      "createdAt": "2025-03-16T00:55:53.640070800Z"
+    },
+    "UK_n8l7Dgj4": {
+      "videoTitle": "주말엔 갈티폰이지~",
+      "channelName": "흔한새TV - Roblox",
+      "videoUrl": "https://www.youtube.com/watch?v=UK_n8l7Dgj4",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "웅이와진아",
+          "messageCount": 1
+        },
+        {
+          "username": "종언",
+          "messageCount": 3
+        },
+        {
+          "username": "곰곰이💝",
+          "messageCount": 4
+        },
+        {
+          "username": "흔한새TV - Roblox",
+          "messageCount": 1
+        },
+        {
+          "username": "이정희",
+          "messageCount": 4
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 1,
+      "averageThroughput": 0.12621359223301,
+      "totalMessages": 13,
+      "topKeywords": [
+        {
+          "keyword": "안녕하세요",
+          "score": 3
+        },
+        {
+          "keyword": "웅이와진아",
+          "score": 1
+        },
+        {
+          "keyword": "안녕하세욘",
+          "score": 1
+        },
+        {
+          "keyword": "안녕하세요?",
+          "score": 1
+        },
+        {
+          "keyword": "시작해",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 92.3,
+        "ESPERANTO": 7.7
+      },
+      "threadName": "yt-scraper-683",
+      "createdAt": "2025-03-16T00:56:11.303194100Z"
+    },
+    "aRa_2pQcddo": {
+      "videoTitle": "ㅎㅇㅎㅇㅇ",
+      "channelName": "ryujehong",
+      "videoUrl": "https://www.youtube.com/watch?v=aRa_2pQcddo",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Risa J. Mun",
+          "messageCount": 1
+        },
+        {
+          "username": "용토",
+          "messageCount": 1
+        },
+        {
+          "username": "정재민",
+          "messageCount": 1
+        },
+        {
+          "username": "제가 잘못했습니다. 근데",
+          "messageCount": 2
+        },
+        {
+          "username": "Winde Lee",
+          "messageCount": 4
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 1,
+      "averageThroughput": 0.10377358490566,
+      "totalMessages": 11,
+      "topKeywords": [
+        {
+          "keyword": "빡세구만ㅋㅋㅋ",
+          "score": 1
+        },
+        {
+          "keyword": "마스터맞아?",
+          "score": 1
+        },
+        {
+          "keyword": "ㅈㄴ무섭네",
+          "score": 1
+        },
+        {
+          "keyword": "win!",
+          "score": 1
+        },
+        {
+          "keyword": "want",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 54.5,
+        "ENGLISH": 27.3
+      },
+      "threadName": "yt-scraper-187",
+      "createdAt": "2025-03-16T00:55:37.176619700Z"
+    },
+    "glzOcE1zJlU": {
+      "videoTitle": "[뉴스쏙] 다시 겨울!? 강원 30㎝ 폭설…전국 흐리고 '쌀쌀'｜내일 영하권 추위 찾아온다/ 연합뉴스TV (YonhapnewsTV)",
+      "channelName": "연합뉴스TV",
+      "videoUrl": "https://www.youtube.com/watch?v=glzOcE1zJlU",
+      "status": "RUNNING",
+      "runningTimeMinutes": 11,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "허신",
+          "messageCount": 1
+        },
+        {
+          "username": "mooreung",
+          "messageCount": 4
+        },
+        {
+          "username": "남동우",
+          "messageCount": 1
+        },
+        {
+          "username": "신토방",
+          "messageCount": 3
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 1,
+      "averageThroughput": 0.0909090909090909,
+      "totalMessages": 9,
+      "topKeywords": [
+        {
+          "keyword": "헌정사를",
+          "score": 1
+        },
+        {
+          "keyword": "헌법과",
+          "score": 1
+        },
+        {
+          "keyword": "한국을",
+          "score": 1
+        },
+        {
+          "keyword": "퇴임전",
+          "score": 1
+        },
+        {
+          "keyword": "쿠데타",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 100
+      },
+      "threadName": "yt-scraper-1069",
+      "createdAt": "2025-03-16T00:56:29.498178400Z"
+    },
+    "jrKUhQZ2PBE": {
+      "videoTitle": "C1 2044 이차식 / 롤재판, 관전 피드백 o",
+      "channelName": "Hecarim King [Chasik]",
+      "videoUrl": "https://www.youtube.com/watch?v=jrKUhQZ2PBE",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Lover Gstory",
+          "messageCount": 1
+        },
+        {
+          "username": "우진",
+          "messageCount": 1
+        },
+        {
+          "username": "전규현",
+          "messageCount": 1
+        },
+        {
+          "username": "협곡이무쪄웡",
+          "messageCount": 1
+        },
+        {
+          "username": "허상우",
+          "messageCount": 2
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 1,
+      "averageThroughput": 0.09,
+      "totalMessages": 9,
+      "topKeywords": [
+        {
+          "keyword": "헤카림",
+          "score": 1
+        },
+        {
+          "keyword": "해커림한테",
+          "score": 1
+        },
+        {
+          "keyword": "하시나요???",
+          "score": 1
+        },
+        {
+          "keyword": "팬티를",
+          "score": 1
+        },
+        {
+          "keyword": "차식님",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "KOREAN": 100
+      },
+      "threadName": "yt-scraper-628",
+      "createdAt": "2025-03-16T00:56:08.423172100Z"
+    },
+    "kRUEBv6XETg": {
+      "videoTitle": "2024–25 NBA Live Scoreboard",
+      "channelName": "BL Football Talks",
+      "videoUrl": "https://www.youtube.com/watch?v=kRUEBv6XETg",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Boots",
+          "messageCount": 1
+        },
+        {
+          "username": "rowell Doquila",
+          "messageCount": 1
+        },
+        {
+          "username": "Mc.kerrovy Herrera",
+          "messageCount": 3
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 1,
+      "averageThroughput": 0.037593984962406,
+      "totalMessages": 5,
+      "topKeywords": [
+        {
+          "keyword": "eason",
+          "score": 2
+        },
+        {
+          "keyword": "warrior's",
+          "score": 1
+        },
+        {
+          "keyword": "rockets",
+          "score": 1
+        },
+        {
+          "keyword": "losing",
+          "score": 1
+        },
+        {
+          "keyword": "let's",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+        "ENGLISH": 40,
+        "SWEDISH": 20
+      },
+      "threadName": "yt-scraper-2",
+      "createdAt": "2025-03-16T00:54:54.406387800Z"
+    },
+    "dxfvdq1tCn8": {
+      "videoTitle": "Amazing Heavy Duty Truck Battle Against Dangerous Water - Spintires Mudrunner",
+      "channelName": "awawa cans",
+      "videoUrl": "https://www.youtube.com/watch?v=dxfvdq1tCn8",
+      "status": "RUNNING",
+      "runningTimeMinutes": 11,
+      "skipLangs": [],
+      "topChatters": [
+        {
+          "username": "Tony Pik",
+          "messageCount": 1
+        }
+      ],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 1,
+      "averageThroughput": 0.00746268656716418,
+      "totalMessages": 1,
+      "topKeywords": [
+        {
+          "keyword": "ឆាឆាឆា",
+          "score": 1
+        }
+      ],
+      "topLanguages": {
+
+      },
+      "threadName": "yt-scraper-1064",
+      "createdAt": "2025-03-16T00:56:29.425031500Z"
+    },
+    "KkGhbaUozJE": {
+      "videoTitle": "Bahamas vs Guatemala | 2025 Concacaf Beach Soccer Championship",
+      "channelName": "Concacaf",
+      "videoUrl": "https://www.youtube.com/watch?v=KkGhbaUozJE",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 0,
+      "averageThroughput": 0,
+      "totalMessages": 0,
+      "topKeywords": [],
+      "topLanguages": {
+
+      },
+      "threadName": "yt-scraper-157",
+      "createdAt": "2025-03-16T00:55:35.034892300Z"
+    },
+    "ngY5Y2WIgHk": {
+      "videoTitle": "【SANIX CUP 2025】16日 7位決定戦 上海申花 vs 飯塚  サニックス杯国際ユースサッカー大会2025",
+      "channelName": "Green Cardチャンネル (株式会社グリーンカード)",
+      "videoUrl": "https://www.youtube.com/watch?v=ngY5Y2WIgHk",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 0,
+      "averageThroughput": 0,
+      "totalMessages": 0,
+      "topKeywords": [],
+      "topLanguages": {
+
+      },
+      "threadName": "yt-scraper-186",
+      "createdAt": "2025-03-16T00:55:36.884323800Z"
+    },
+    "UGozc-CAyCY": {
+      "videoTitle": "[뉴스쏙] '짧았던 봄은 잠시 후 이어집니다'…다시 등장한 꽃샘추위·폭설 예보 / 연합뉴스TV (YonhapnewsTV)",
+      "channelName": "연합뉴스TV",
+      "videoUrl": "https://www.youtube.com/watch?v=UGozc-CAyCY",
+      "status": "RUNNING",
+      "runningTimeMinutes": 13,
+      "skipLangs": [],
+      "topChatters": [],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 0,
+      "averageThroughput": 0,
+      "totalMessages": 0,
+      "topKeywords": [],
+      "topLanguages": {
+
+      },
+      "threadName": "yt-scraper-1",
+      "createdAt": "2025-03-16T00:54:54.408281Z"
+    },
+    "R-G-5DH6xq0": {
+      "videoTitle": "🔴 YONEX All England Open Badminton Championships 2025 Live 🏸",
+      "channelName": "BL Football Talks",
+      "videoUrl": "https://www.youtube.com/watch?v=R-G-5DH6xq0",
+      "status": "RUNNING",
+      "runningTimeMinutes": 11,
+      "skipLangs": [],
+      "topChatters": [],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 0,
+      "averageThroughput": 0,
+      "totalMessages": 0,
+      "topKeywords": [],
+      "topLanguages": {
+
+      },
+      "threadName": "yt-scraper-1070",
+      "createdAt": "2025-03-16T00:56:30.245469200Z"
+    },
+    "DhElG0ABLa0": {
+      "videoTitle": "2025 IMSA Twelve Hours of Sebring | Aston Martin Valkyrie | GTP | Live In-Car",
+      "channelName": "IMSA Official",
+      "videoUrl": "https://www.youtube.com/watch?v=DhElG0ABLa0",
+      "status": "RUNNING",
+      "runningTimeMinutes": 12,
+      "skipLangs": [],
+      "topChatters": [],
+      "recentDonations": [],
+      "lastThroughput": 0,
+      "maxThroughput": 0,
+      "averageThroughput": 0,
+      "totalMessages": 0,
+      "topKeywords": [],
+      "topLanguages": {
+
+      },
+      "threadName": "yt-scraper-64",
+      "createdAt": "2025-03-16T00:55:24.665807700Z"
+    }
+  }
+}

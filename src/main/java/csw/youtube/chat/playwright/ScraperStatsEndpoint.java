@@ -79,6 +79,7 @@ public class ScraperStatsEndpoint {
                     topLanguages, // %
                     state.getThreadName(),
                     state.getCreatedAt(),
+                    state.getFinishedAt(),
                     state.getErrorMessage()
             );
 
