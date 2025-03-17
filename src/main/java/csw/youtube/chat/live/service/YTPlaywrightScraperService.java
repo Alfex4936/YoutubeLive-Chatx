@@ -31,9 +31,12 @@ public class YTPlaywrightScraperService {
     private static final int POLL_INTERVAL_MS = 1000;
     private static final int PLAYWRIGHT_TIMEOUT_MS = 10000;
 
-    @Getter private final Map<String, CompletableFuture<Void>> activeFutures = new ConcurrentHashMap<>();
-    @Getter private final Map<String, ScraperState> scraperStates = new ConcurrentHashMap<>();
-    @Getter private final Map<String, String> videoThreadNames = new ConcurrentHashMap<>();
+    @Getter
+    private final Map<String, CompletableFuture<Void>> activeFutures = new ConcurrentHashMap<>();
+    @Getter
+    private final Map<String, ScraperState> scraperStates = new ConcurrentHashMap<>();
+    @Getter
+    private final Map<String, String> videoThreadNames = new ConcurrentHashMap<>();
 
     private final ProfanityLogService profanityLogService;
     private final RankingService rankingService;

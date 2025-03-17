@@ -14,18 +14,6 @@ import java.util.Set;
 @Configuration
 public class LinguaConfig {
 
-    @Bean
-    public LanguageDetector globalLanguageDetector() {
-        // Build it once at startup
-        return LanguageDetectorBuilder
-                .fromAllSpokenLanguages()
-                // or e.g. fromLanguages(Language.ENGLISH, Language.SPANISH, Language.FRENCH, ...)
-                .withPreloadedLanguageModels()  // Eager load all models into memory
-                .withLowAccuracyMode()          // Optional: for speed, if short messages are typical
-                .withMinimumRelativeDistance(0.00) // So we don't over-filter short texts
-                .build();
-    }
-
     public static Set<Language> parseLanguages(List<String> langs) {
         if (langs == null || langs.isEmpty()) {
             return Collections.emptySet(); // skip-langs is empty => don't skip any
@@ -40,5 +28,17 @@ public class LinguaConfig {
             }
         }
         return set;
+    }
+
+    @Bean
+    public LanguageDetector globalLanguageDetector() {
+        // Build it once at startup
+        return LanguageDetectorBuilder
+                .fromAllSpokenLanguages()
+                // or e.g. fromLanguages(Language.ENGLISH, Language.SPANISH, Language.FRENCH, ...)
+                .withPreloadedLanguageModels()  // Eager load all models into memory
+                .withLowAccuracyMode()          // Optional: for speed, if short messages are typical
+                .withMinimumRelativeDistance(0.00) // So we don't over-filter short texts
+                .build();
     }
 }

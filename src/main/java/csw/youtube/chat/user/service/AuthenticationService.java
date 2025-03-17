@@ -1,19 +1,13 @@
 package csw.youtube.chat.user.service;
 
 
-import csw.youtube.chat.common.config.security.JwtService;
 import csw.youtube.chat.common.exception.DuplicateResourceException;
-import csw.youtube.chat.common.exception.ResourceNotFoundException;
-import csw.youtube.chat.user.dto.AuthenticationRequest;
-import csw.youtube.chat.user.dto.AuthenticationResponse;
-import csw.youtube.chat.user.dto.RefreshTokenRequest;
 import csw.youtube.chat.user.dto.UserRegisterRequest;
 import csw.youtube.chat.user.model.User;
 import csw.youtube.chat.user.model.permission.Role;
 import csw.youtube.chat.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;

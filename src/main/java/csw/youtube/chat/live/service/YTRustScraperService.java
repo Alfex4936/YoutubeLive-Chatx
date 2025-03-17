@@ -9,10 +9,10 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.*;
-import org.redisson.client.protocol.ScoredEntry;
+import org.redisson.api.RBlockingQueue;
+import org.redisson.api.RSemaphore;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -156,6 +156,10 @@ public class YTRustScraperService {
     }
 
     public ScraperState getScraperState(String videoId) {
+        if (!scraperStates.containsKey(videoId)) {
+            log.warn("No ScraperState found for videoId='{}'. Existing keys: {}",
+                    videoId, getScraperStates().keySet());
+        }
         return scraperStates.get(videoId);
     }
 
@@ -218,8 +222,6 @@ public class YTRustScraperService {
         } catch (IOException e) {
             log.error("Error capturing output for {}", videoId, e);
             updateScraperStatusToFailed(videoId, "Communication with Rust scraper failed.");
-        } finally {
-            // log.info("Scraper process for video {} has exited.", videoId);
         }
     }
 

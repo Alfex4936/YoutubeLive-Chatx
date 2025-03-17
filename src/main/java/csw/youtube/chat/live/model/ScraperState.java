@@ -56,11 +56,11 @@ public class ScraperState {
         return YTRustScraperService.YOUTUBE_WATCH_URL + videoId;
     }
 
-    public enum Status {
-        QUEUED, IDLE, RUNNING, FAILED, COMPLETED
-    }
-
     public boolean isActiveOrDead() {
         return this.status == Status.RUNNING || this.status == Status.COMPLETED || this.status == Status.FAILED;
+    }
+
+    public enum Status {
+        QUEUED, IDLE, RUNNING, FAILED, COMPLETED
     }
 }

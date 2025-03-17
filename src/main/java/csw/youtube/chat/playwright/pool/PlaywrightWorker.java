@@ -9,12 +9,12 @@ import java.util.concurrent.*;
 
 public class PlaywrightWorker extends Thread {
     private final BlockingQueue<Callable<Object>> taskQueue = new LinkedBlockingQueue<>();
+    private final CountDownLatch initialized = new CountDownLatch(1);
     private Playwright playwright;
     private Browser browser;
     private BrowserContext context;
     private Page page;
     private volatile boolean running = true;
-    private final CountDownLatch initialized = new CountDownLatch(1);
 
     public PlaywrightWorker() {
         setDaemon(true);

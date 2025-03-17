@@ -206,40 +206,6 @@ public class DAT<V> implements Serializable {
     }
 
     /**
-     * Processor handles the output when hitting a keyword
-     */
-    public interface IHit<V> {
-        void hit(int begin, int end, V value);
-    }
-
-    /**
-     * Processor handles the output when hitting a keyword, with more detail
-     */
-    public interface IHitFull<V> {
-        void hit(int begin, int end, V value, int index);
-    }
-
-    /**
-     * Callback that allows cancelling the search process
-     */
-    public interface IHitCancellable<V> {
-        boolean hit(int begin, int end, V value);
-    }
-
-    /**
-     * A result output
-     *
-     * @param <V> the value type
-     */
-    public record Hit<V>(int begin, int end, V value) {
-
-        @Override
-        public String toString() {
-            return String.format("[%d:%d]=%s", begin, end, value);
-        }
-    }
-
-    /**
      * Transmit state, supports failure function
      *
      * @param currentState The current state
@@ -302,10 +268,10 @@ public class DAT<V> implements Serializable {
     /**
      * Match exactly by a key
      *
-     * @param key      The key
-     * @param pos      The position
-     * @param len      The length
-     * @param nodePos  The node position
+     * @param key     The key
+     * @param pos     The position
+     * @param len     The length
+     * @param nodePos The node position
      * @return The index of the key
      */
     private int exactMatchSearch(CharSequence key, int pos, int len, int nodePos) {
@@ -330,6 +296,108 @@ public class DAT<V> implements Serializable {
      */
     public int size() {
         return values.length;
+    }
+
+    /**
+     * Processor handles the output when hitting a keyword
+     */
+    public interface IHit<V> {
+        void hit(int begin, int end, V value);
+    }
+
+    /**
+     * Processor handles the output when hitting a keyword, with more detail
+     */
+    public interface IHitFull<V> {
+        void hit(int begin, int end, V value, int index);
+    }
+
+    /**
+     * Callback that allows cancelling the search process
+     */
+    public interface IHitCancellable<V> {
+        boolean hit(int begin, int end, V value);
+    }
+
+    /**
+     * A result output
+     *
+     * @param <V> the value type
+     */
+    public record Hit<V>(int begin, int end, V value) {
+
+        @Override
+        public String toString() {
+            return String.format("[%d:%d]=%s", begin, end, value);
+        }
+    }
+
+    private static class State {
+        @Getter
+        private final int depth;
+
+        @Getter
+        private final Map<Character, State> success = new HashMap<>();
+        private Set<Integer> emits = null;
+        private State failure = null;
+        @Getter
+        private int largestValueId = -1;
+        @Getter
+        @Setter
+        private int index;
+
+        public State() {
+            this(0);
+        }
+
+        public State(int depth) {
+            this.depth = depth;
+        }
+
+        public State addState(Character character) {
+            return success.computeIfAbsent(character, c -> new State(depth + 1));
+        }
+
+        public State nextState(Character character) {
+            return success.get(character);
+        }
+
+        public Collection<State> getStates() {
+            return success.values();
+        }
+
+        public Collection<Character> getTransitions() {
+            return success.keySet();
+        }
+
+        public void addEmit(int keyword) {
+            if (emits == null) emits = new HashSet<>();
+            emits.add(keyword);
+            if (keyword > largestValueId) largestValueId = keyword;
+        }
+
+        public void addEmit(Collection<Integer> emits) {
+            if (this.emits == null) this.emits = new HashSet<>();
+            this.emits.addAll(emits);
+        }
+
+        public Collection<Integer> emit() {
+            return emits == null ? Collections.emptyList() : emits;
+        }
+
+        public boolean isAcceptable() {
+            return depth > 0 && emits != null;
+        }
+
+        public State failure() {
+            return failure;
+        }
+
+        public void setFailure(State failState, int[] fail) {
+            this.failure = failState;
+            fail[index] = failState.getIndex();
+        }
+
     }
 
     /**
@@ -538,73 +606,5 @@ public class DAT<V> implements Serializable {
             parent.getSuccess().forEach((key, value) -> siblings.add(new AbstractMap.SimpleEntry<>(key + 1, value)));
             return siblings.size();
         }
-    }
-
-    private static class State {
-        @Getter
-        private final int depth;
-
-        @Getter
-        private final Map<Character, State> success = new HashMap<>();
-        private Set<Integer> emits = null;
-        private State failure = null;
-        @Getter
-        private int largestValueId = -1;
-        @Getter
-        @Setter
-        private int index;
-
-        public State() {
-            this(0);
-        }
-
-        public State(int depth) {
-            this.depth = depth;
-        }
-
-        public State addState(Character character) {
-            return success.computeIfAbsent(character, c -> new State(depth + 1));
-        }
-
-        public State nextState(Character character) {
-            return success.get(character);
-        }
-
-        public Collection<State> getStates() {
-            return success.values();
-        }
-
-        public Collection<Character> getTransitions() {
-            return success.keySet();
-        }
-
-        public void addEmit(int keyword) {
-            if (emits == null) emits = new HashSet<>();
-            emits.add(keyword);
-            if (keyword > largestValueId) largestValueId = keyword;
-        }
-
-        public void addEmit(Collection<Integer> emits) {
-            if (this.emits == null) this.emits = new HashSet<>();
-            this.emits.addAll(emits);
-        }
-
-        public Collection<Integer> emit() {
-            return emits == null ? Collections.emptyList() : emits;
-        }
-
-        public boolean isAcceptable() {
-            return depth > 0 && emits != null;
-        }
-
-        public State failure() {
-            return failure;
-        }
-
-        public void setFailure(State failState, int[] fail) {
-            this.failure = failState;
-            fail[index] = failState.getIndex();
-        }
-
     }
 }

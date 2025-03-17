@@ -1,7 +1,6 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
-import csw.youtube.chat.common.annotation.RateLimit;
 import csw.youtube.chat.common.util.LocalDater;
 import csw.youtube.chat.live.dto.KeywordRankingPair;
 import csw.youtube.chat.live.dto.MessagesRequest;
@@ -51,6 +50,10 @@ public class ScraperController {
 
         ScraperState.Status newStatus = ScraperState.Status.valueOf(request.status());
         state.setStatus(newStatus);
+
+        if (newStatus == ScraperState.Status.COMPLETED) {
+            state.setFinishedAt(Instant.now());
+        }
 
         long lastThroughput = request.messagesInLastInterval();
         state.setLastThroughput(lastThroughput);
@@ -192,7 +195,7 @@ public class ScraperController {
     // 1 req/sec, 1 sec tolerance
     @GetMapping("/start")
     public ResponseEntity<Map<String, String>> startScraper(@RequestParam String videoId,
-            @RequestParam(required = false) List<String> langs) {
+                                                            @RequestParam(required = false) List<String> langs) {
         if (langs != null) {
             langs = langs.subList(0, Math.min(5, langs.size()));
         }
@@ -218,7 +221,7 @@ public class ScraperController {
 
     @GetMapping("/keyword-ranking")
     public java.util.Set<ZSetOperations.TypedTuple<String>> getKeywords(@RequestParam String videoId,
-            @RequestParam int k) {
+                                                                        @RequestParam int k) {
         return rankingService.getTopKeywords(videoId, k);
     }
 

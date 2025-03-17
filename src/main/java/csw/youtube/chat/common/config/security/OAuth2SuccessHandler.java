@@ -105,13 +105,13 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private String extractProfilePicture(OAuth2User oauth2User) {
         String profilePicture = oauth2User.getAttribute("picture"); // Google
         if (profilePicture == null && oauth2User.getAttribute("kakao_account") != null) {
-            Map<String,Object> kakaoAccount = oauth2User.getAttribute("kakao_account");
+            Map<String, Object> kakaoAccount = oauth2User.getAttribute("kakao_account");
             if (kakaoAccount != null && kakaoAccount.get("profile") != null) {
                 profilePicture = kakaoAccount.get("profile").toString();
             }
         }
         if (profilePicture == null && oauth2User.getAttribute("response") != null) {
-            Map<String,Object> naverResponse = oauth2User.getAttribute("response");
+            Map<String, Object> naverResponse = oauth2User.getAttribute("response");
             if (naverResponse != null && naverResponse.get("profile_image") != null) {
                 profilePicture = naverResponse.get("profile_image").toString();
             }

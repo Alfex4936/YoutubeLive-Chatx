@@ -3,8 +3,13 @@ package csw.youtube.chat.user.model.permission;
 import java.util.Set;
 
 public record AdminRole() implements Role {
-    @Override public String name() { return "ADMIN"; }
-    @Override public Set<Permission> permissions() {
+    @Override
+    public String name() {
+        return "ADMIN";
+    }
+
+    @Override
+    public Set<Permission> permissions() {
         return Set.of(
                 Permission.ADMIN_READ,
                 Permission.ADMIN_UPDATE,

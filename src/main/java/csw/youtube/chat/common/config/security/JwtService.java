@@ -6,7 +6,6 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
@@ -107,15 +106,26 @@ public class JwtService {
     }
 
     public static class JwtTokenExpiredException extends JwtException {
-        public JwtTokenExpiredException(String message) { super(message); }
+        public JwtTokenExpiredException(String message) {
+            super(message);
+        }
     }
+
     public static class MalformedJwtTokenException extends JwtException {
-        public MalformedJwtTokenException(String message) { super(message); }
+        public MalformedJwtTokenException(String message) {
+            super(message);
+        }
     }
+
     public static class JwtSignatureException extends JwtException {
-        public JwtSignatureException(String message) { super(message); }
+        public JwtSignatureException(String message) {
+            super(message);
+        }
     }
+
     public static class JwtValidationException extends JwtException {
-        public JwtValidationException(String message) { super(message); }
+        public JwtValidationException(String message) {
+            super(message);
+        }
     }
 }

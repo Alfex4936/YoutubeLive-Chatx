@@ -6,13 +6,11 @@ import com.microsoft.playwright.Page;
 import csw.youtube.chat.playwright.PlaywrightBrowserHolder;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 public class PlaywrightPoolManager {

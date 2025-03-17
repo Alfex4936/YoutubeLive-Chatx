@@ -13,4 +13,5 @@ public record AuthenticationResponse(
         @Schema(description = "리프레시 토큰", example = "eyJhbGciOiJI...")
         @JsonProperty("refresh_token")
         String refreshToken
-) {}
+) {
+}

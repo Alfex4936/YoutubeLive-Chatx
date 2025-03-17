@@ -13,6 +13,7 @@ public sealed interface Role permits AdminRole, ManagerRole, UserRole {
     Role USER = new UserRole();
 
     String name();
+
     Set<Permission> permissions();
 
     default List<SimpleGrantedAuthority> getAuthorities() {
