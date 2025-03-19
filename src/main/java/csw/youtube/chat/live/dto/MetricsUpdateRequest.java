@@ -5,6 +5,6 @@ import java.util.List;
 
 public record MetricsUpdateRequest(String videoTitle, String channelName, String videoId, Instant createdAt,
                                    List<String> skipLangs, long messagesInLastInterval, long totalMessages,
-                                   String status,
+                                   String status, String reason,
                                    List<TopChatter> topChatters, List<RecentDonator> recentDonations) {
 }

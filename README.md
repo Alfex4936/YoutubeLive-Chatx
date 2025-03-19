@@ -1,6 +1,6 @@
 # YTChatX
 
-![frontend_demo3-1](https://github.com/user-attachments/assets/5a7957fb-c1e8-404b-92be-fc68119d5196)
+https://github.com/user-attachments/assets/d67aef83-c49e-46df-bf5a-f72f36c41cc3
 
 <table>
   <tr>
@@ -49,6 +49,7 @@ YouTube Live 채팅을 API 없이 **실시간**으로 읽어 분석하는 프로
   - 언어 통계 (top 3 언어 %)
   - 가장 많이 채팅한 사용자
   - 최근 10 도네이션 (TODO: 환율 변경기)
+  - 최근 5분동안 메시지 AI 요약 (gemini-2.0-flash, 로그인 필요)
   - [ ] 고유 사용자 수 집계
   - [ ] 그래프 저장 (지난 방송과 비교, 채팅 트렌드 비교)
     - [x] 30분 동안 메시지 수 차트 그래프

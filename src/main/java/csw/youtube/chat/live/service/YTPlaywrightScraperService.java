@@ -131,7 +131,7 @@ public class YTPlaywrightScraperService {
         log.error("Error in scrapeChannel for video {}", videoId, ex);
         scraperFuture.completeExceptionally(ex);
         state.setStatus(ScraperState.Status.FAILED);
-        state.setErrorMessage("Outer error: " + ex.getMessage());
+        state.setReason("Outer error: " + ex.getMessage());
     }
 
     private ScraperState initializeScraperState(String videoId) {
@@ -220,12 +220,12 @@ public class YTPlaywrightScraperService {
             handlePlaywrightException(videoId, pwe);
             scraperFuture.completeExceptionally(pwe);
             state.setStatus(ScraperState.Status.FAILED);
-            state.setErrorMessage(parsePlaywrightError(pwe));
+            state.setReason(parsePlaywrightError(pwe));
         } catch (Exception ex) {
             log.error("Error in scraping logic for videoId={}: {}", videoId, ex.getMessage(), ex);
             scraperFuture.completeExceptionally(ex);
             state.setStatus(ScraperState.Status.FAILED);
-            state.setErrorMessage("General error: " + ex.getMessage());
+            state.setReason("General error: " + ex.getMessage());
         } finally {
             closePageSafely(page, videoId);
         }
@@ -254,7 +254,7 @@ public class YTPlaywrightScraperService {
         var state = scraperStates.get(videoId);
         if (state != null) {
             state.setStatus(ScraperState.Status.COMPLETED);
-            state.setErrorMessage("Stopped by user.");
+            state.setReason("Stopped by user.");
         }
     }
 

@@ -64,12 +64,10 @@ public class RateLimitInterceptor {
                     if (config != null) {
                         response.setHeader("X-RateLimit-Limit", String.valueOf(config.permitsPerSecond())); // Or calculate based on interval
 
-                        // Calculate dynamic Retry-After based on emissionIntervalNanos
-                        long retryAfterNanos = config.emissionIntervalNanos();
-                        long retryAfterSeconds = TimeUnit.NANOSECONDS.toSeconds(retryAfterNanos); // Convert to seconds
-                        if (retryAfterSeconds < 1) {
-                            retryAfterSeconds = 1; // Minimum 1 second (or fraction?)
-                        }
+                        long now = System.nanoTime();
+                        long nextAllowedTimeNanos = gcraRateLimiter.lastTheoreticalArrivalTime.get(dynamicKey).get();
+                        long retryAfterSeconds = TimeUnit.NANOSECONDS.toSeconds(nextAllowedTimeNanos - now);
+                        retryAfterSeconds = Math.max(retryAfterSeconds, 1);
                         response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
                     }
                 }

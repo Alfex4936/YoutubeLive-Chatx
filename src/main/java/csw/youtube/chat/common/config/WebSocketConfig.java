@@ -27,6 +27,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Enable a simple broker for "/live" destinations and set heartbeat intervals (ms)
         registry.enableSimpleBroker("/live")
                 .setTaskScheduler(taskScheduler)
+
                 .setHeartbeatValue(new long[]{10000, 10000});
         // All application messages will have the "/app" prefix
         registry.setApplicationDestinationPrefixes("/app");

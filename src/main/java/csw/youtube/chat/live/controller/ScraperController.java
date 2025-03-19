@@ -75,6 +75,10 @@ public class ScraperController {
             state.setRecentDonations(request.recentDonations());
         }
 
+        if (request.reason() != null && !request.reason().isEmpty()) {
+            state.setReason(request.reason());
+        }
+
         if (newStatus == ScraperState.Status.IDLE && request.skipLangs() != null) {
             Set<Language> skipLangs = parseLanguages(
                     request.skipLangs().subList(0, Math.min(5, request.skipLangs().size())));
@@ -203,18 +207,35 @@ public class ScraperController {
 
         if (videoId.startsWith("/")) {
             videoId = videoId.substring(1);
-        }
-        if (videoId.startsWith("http")) {
+        } else if (videoId.startsWith("http")) {
             videoId = videoId.replace(YTRustScraperService.YOUTUBE_WATCH_URL, "");
         }
 
+        // Get queue information before starting the scraper
+        int queueSize = scraperService.getQueueSize();
+        int activeScrapers = scraperService.getActiveScrapersCount();
+        int maxScrapers = scraperService.getMaxConcurrentScrapers();
+        int position = 0;
+
         boolean queued = scraperService.startRustScraper(videoId, skipLangs);
+        if (queued) {
+            // Calculate position (only relevant if queued)
+            if (activeScrapers >= maxScrapers) {
+                // If all slots are full, position is based on queue size
+                // Add 1 because this request will be in the queue too
+                position = queueSize + 1;
+            }
+        }
+
         String message = queued ? "Scraper queued for video " + videoId
                 : "Scraper already running/queued for video " + videoId;
 
-        // Return JSON instead of 302 redirect
+        // Return JSON with queue information
         Map<String, String> response = new HashMap<>();
         response.put("message", message);
+        response.put("queuePosition", String.valueOf(position));
+//        response.put("activeScrapers", String.valueOf(activeScrapers));
+//        response.put("maxConcurrentScrapers", String.valueOf(maxScrapers));
 
         return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
     }
@@ -262,7 +283,7 @@ public class ScraperController {
                 state.getThreadName(),
                 state.getCreatedAt(),
                 state.getFinishedAt(),
-                state.getErrorMessage());
+                state.getReason());
 
         return ResponseEntity.ok(metrics);
     }

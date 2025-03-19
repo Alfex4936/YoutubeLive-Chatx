@@ -118,6 +118,9 @@ public class YTRustScraperService {
     }
 
     public void processChatMessages(String videoId, List<SimpleChatMessage> messages) {
+        ScraperState state = scraperStates.computeIfAbsent(videoId, ScraperState::new);
+        state.addRecentMessages(messages);
+
         // Store message count stats (in a separate async task)
         chatScraperExecutor.execute(() -> {
             int messageCount = messages.size();
@@ -242,7 +245,7 @@ public class YTRustScraperService {
             Thread.currentThread().interrupt();
             log.error("Failed to queue scraper for video {}", videoId, e);
             state.setStatus(ScraperState.Status.FAILED);
-            state.setErrorMessage("Queueing failed: " + e.getMessage());
+            state.setReason("Queueing failed: " + e.getMessage());
             return false;
         }
     }
@@ -309,11 +312,11 @@ public class YTRustScraperService {
             int exitCode = process.waitFor();
             state.setStatus(exitCode == 0 ? ScraperState.Status.COMPLETED : ScraperState.Status.FAILED);
             if (exitCode != 0)
-                state.setErrorMessage("Process exited with code " + exitCode);
+                state.setReason("Process exited with code " + exitCode);
         } catch (Exception e) {
             log.error("Error running scraper for video {}", videoId, e);
             state.setStatus(ScraperState.Status.FAILED);
-            state.setErrorMessage(e.getMessage());
+            state.setReason(e.getMessage());
             scraperSemaphore.release();
         } finally {
             activeScrapers.remove(videoId);
@@ -342,7 +345,7 @@ public class YTRustScraperService {
         Optional.ofNullable(scraperStates.get(videoId))
                 .ifPresent(state -> {
                     state.setStatus(ScraperState.Status.FAILED);
-                    state.setErrorMessage(errorMessage);
+                    state.setReason(errorMessage);
                 });
     }
 
@@ -351,7 +354,7 @@ public class YTRustScraperService {
                 .ifPresent(state -> {
                     state.setStatus(ScraperState.Status.COMPLETED);
                     state.setFinishedAt(Instant.now());
-                    state.setErrorMessage("Stopped by user.");
+                    state.setReason("Stopped by user.");
                 });
     }
 
@@ -377,5 +380,29 @@ public class YTRustScraperService {
 
         // log.info("messageCounts: {}", timeCountMap);
         return timeCountMap;
+    }
+
+    /**
+     * Gets the current size of the scraper queue
+     * @return The number of tasks waiting in the queue
+     */
+    public int getQueueSize() {
+        return scraperQueue.size();
+    }
+
+    /**
+     * Gets the current number of active scrapers
+     * @return The number of currently running scrapers
+     */
+    public int getActiveScrapersCount() {
+        return activeScrapers.size();
+    }
+
+    /**
+     * Gets the maximum number of concurrent scrapers allowed
+     * @return The maximum number of concurrent scrapers
+     */
+    public int getMaxConcurrentScrapers() {
+        return MAX_CONCURRENT_SCRAPERS;
     }
 }

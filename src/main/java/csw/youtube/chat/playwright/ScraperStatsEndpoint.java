@@ -80,7 +80,7 @@ public class ScraperStatsEndpoint {
                     state.getThreadName(),
                     state.getCreatedAt(),
                     state.getFinishedAt(),
-                    state.getErrorMessage()
+                    state.getReason()
             );
 
             statsList.add(new AbstractMap.SimpleEntry<>(videoId, metrics));

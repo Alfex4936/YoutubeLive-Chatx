@@ -385,7 +385,8 @@ public class RankingService {
 
     /**
      * Checks if a word is valid for counting:
-     * - not too short
+     * - not too short (3)
+     * - not too long (20)
      * - not numeric
      * - not all symbols
      * - not in the ignore list
@@ -397,7 +398,7 @@ public class RankingService {
 
         word = word.trim().toLowerCase(Locale.ROOT);
 
-        return word.codePointCount(0, word.length()) >= 3
+        return (word.codePointCount(0, word.length()) >= 3 && word.codePointCount(0, word.length()) <= 20)
                 && !isNumeric(word)
                 && !isSymbolOnly(word)
                 && word.chars().distinct().count() > 1
