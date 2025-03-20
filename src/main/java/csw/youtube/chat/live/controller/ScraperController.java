@@ -1,37 +1,18 @@
 package csw.youtube.chat.live.controller;
 
 import com.github.pemistahl.lingua.api.Language;
-import csw.youtube.chat.common.util.LocalDater;
-import csw.youtube.chat.live.dto.KeywordRankingPair;
-import csw.youtube.chat.live.dto.MessagesRequest;
-import csw.youtube.chat.live.dto.MetricsUpdateRequest;
-import csw.youtube.chat.live.dto.ScraperMetrics;
-import csw.youtube.chat.live.model.ScraperState;
-import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.live.service.YTRustScraperService;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartUtils;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.axis.DateAxis;
-import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
-import org.jfree.chart.title.TextTitle;
-import org.jfree.data.time.Second;
-import org.jfree.data.time.TimeSeries;
-import org.jfree.data.time.TimeSeriesCollection;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.awt.*;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 
@@ -41,250 +22,42 @@ import static csw.youtube.chat.common.config.LinguaConfig.parseLanguages;
 public class ScraperController {
 
     private final YTRustScraperService scraperService;
-    private final RankingService rankingService;
-
-    @PatchMapping("/updateMetrics")
-    public ResponseEntity<Void> updateMetrics(@RequestBody MetricsUpdateRequest request) {
-        ScraperState state = scraperService.getScraperStates()
-                .computeIfAbsent(request.videoId(), ScraperState::new);
-
-        ScraperState.Status newStatus = ScraperState.Status.valueOf(request.status());
-        state.setStatus(newStatus);
-
-        if (newStatus == ScraperState.Status.COMPLETED) {
-            state.setFinishedAt(Instant.now());
-        }
-
-        long lastThroughput = request.messagesInLastInterval();
-        state.setLastThroughput(lastThroughput);
-        state.getTotalMessages().set(request.totalMessages());
-        long intervals = state.getIntervalsCount().incrementAndGet();
-        double newAvg = intervals == 1
-                ? lastThroughput
-                : (state.getAverageThroughput() * (intervals - 1) + lastThroughput) / intervals;
-
-        state.setAverageThroughput(newAvg);
-        state.setMaxThroughput(Math.max(lastThroughput, state.getMaxThroughput()));
-
-        // Store top chatters if provided
-        if (request.topChatters() != null && !request.topChatters().isEmpty()) {
-            state.setTopChatters(request.topChatters());
-        }
-
-        if (request.recentDonations() != null && !request.recentDonations().isEmpty()) {
-            state.setRecentDonations(request.recentDonations());
-        }
-
-        if (request.reason() != null && !request.reason().isEmpty()) {
-            state.setReason(request.reason());
-        }
-
-        if (newStatus == ScraperState.Status.IDLE && request.skipLangs() != null) {
-            Set<Language> skipLangs = parseLanguages(
-                    request.skipLangs().subList(0, Math.min(5, request.skipLangs().size())));
-            state.setSkipLangs(skipLangs);
-        }
-
-        // TODO what if user updates video title
-        if ((newStatus == ScraperState.Status.IDLE || newStatus == ScraperState.Status.RUNNING)) {
-            if (request.videoTitle() != null) {
-                state.setVideoTitle(request.videoTitle());
-            }
-            if (request.channelName() != null) {
-                state.setChannelName(request.channelName());
-            }
-        }
-        if (request.createdAt() != null) {
-            state.setCreatedAt(request.createdAt());
-        }
-
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/messages")
-    public ResponseEntity<Void> processMessages(@RequestBody MessagesRequest request) {
-        scraperService.processChatMessages(request.videoId(), request.messages());
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/messageGraph")
-    public void getMessageGraph(@RequestParam String videoId, @RequestParam String lang, HttpServletResponse response)
-            throws IOException {
-        ScraperState state = scraperService.getScraperState(videoId);
-        if (state == null || !state.isActiveOrDead()) {
-            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            return;
-        }
-
-        // Retrieve message count data
-        Map<Instant, Integer> messageCounts = scraperService.getMessageCounts(videoId);
-        TimeSeries series = new TimeSeries("Messages");
-
-        // Populate the time series dataset
-        for (Map.Entry<Instant, Integer> entry : messageCounts.entrySet()) {
-            series.addOrUpdate(new Second(Date.from(entry.getKey())), entry.getValue());
-        }
-        TimeSeriesCollection dataset = new TimeSeriesCollection(series);
-
-        // Create the chart
-        JFreeChart chart = ChartFactory.createTimeSeriesChart(
-                state.getVideoTitle(),
-                "Time",
-                "Message Count",
-                dataset,
-                false, // Legend
-                true, // Tooltips
-                false // URLs
-        );
-
-        // Set a proper font for the title (avoid system fallback)
-        Font titleFont = new Font("SansSerif", Font.BOLD, 14);
-        chart.setTitle(new TextTitle(state.getVideoTitle(), titleFont));
-
-        // Subtitle for video URL
-        Locale locale = LocalDater.getLocaleFromLang(lang);
-        String formattedDate = LocalDater.getLocalizedDate(locale);
-
-        String videoUrl = scraperService.getScraperState(videoId).getVideoUrl();
-        TextTitle subtitle = new TextTitle(formattedDate + " | " + videoUrl, new Font("SansSerif", Font.ITALIC, 12));
-        chart.addSubtitle(subtitle);
-
-        // Apply custom styling
-        XYPlot plot = (XYPlot) chart.getPlot();
-        plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
-        plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
-        plot.setBackgroundPaint(new Color(240, 240, 240)); // Soft background
-
-        // Set time formatting
-        DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
-        domainAxis.setDateFormatOverride(new SimpleDateFormat("HH:mm:ss", locale));
-        domainAxis.setLabelAngle(0); // No rotation for "Time"
-        domainAxis.setVerticalTickLabels(true); // Vertical tick labels (timestamps)
-
-        // Customize line rendering (thicker line + circular markers)
-        XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, true);
-        renderer.setSeriesPaint(0, Color.RED);
-        renderer.setSeriesStroke(0, new BasicStroke(2.0f)); // Thicker line
-        renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-3, -3, 6, 6)); // Circular markers
-        plot.setRenderer(renderer);
-
-        // Enable tooltips
-        // renderer.setDefaultToolTipGenerator((dataset, series, item) -> {
-        // Instant timestamp = messageCounts.keySet().toArray(new Instant[0])[item];
-        // int count = messageCounts.get(timestamp);
-        // return String.format("Time: %s\nMessages: %d\nWatch: %s", timestamp, count,
-        // scraperService.getScraperState(videoId).getVideoUrl());
-        // });
-
-        // Write the chart as PNG
-        response.setContentType("image/png");
-        ChartUtils.writeChartAsPNG(response.getOutputStream(), chart, 1000, 700);
-    }
-
-    @GetMapping("/stop")
-    public ResponseEntity<Map<String, String>> stopRustScraper(@RequestParam String videoId) {
-        String result = scraperService.stopRustScraper(videoId);
-
-        // Encode the message to be URL-safe
-        // String encodedMsg = URLEncoder.encode(result, StandardCharsets.UTF_8);
-
-        // Return JSON instead of 302 redirect
-        Map<String, String> response = new HashMap<>();
-        response.put("message", result);
-
-        return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
-    }
 
     // @RateLimit(key = "start-scraper", permitsPerSecond = 1, tolerance = 1000) //
     // 1 req/sec, 1 sec tolerance
     @GetMapping("/start")
-    public ResponseEntity<Map<String, String>> startScraper(@RequestParam String videoId,
-                                                            @RequestParam(required = false) List<String> langs) {
-        if (langs != null) {
-            langs = langs.subList(0, Math.min(5, langs.size()));
-        }
-        Set<Language> skipLangs = parseLanguages(langs);
+    public ResponseEntity<Map<String, String>> startScraper(
+            @RequestParam String videoId,
+            @RequestParam(required = false) List<String> langs) {
 
-        if (videoId.startsWith("/")) {
-            videoId = videoId.substring(1);
-        } else if (videoId.startsWith("http")) {
-            videoId = videoId.replace(YTRustScraperService.YOUTUBE_WATCH_URL, "");
-        }
+        // Limit languages to 5 if provided
+        Set<Language> skipLangs = (langs != null)
+                ? parseLanguages(langs.subList(0, Math.min(5, langs.size())))
+                : Collections.emptySet();
 
-        // Get queue information before starting the scraper
+        videoId = scraperService.sanitizeVideoId(videoId);
+
+        // Get scraper state
         int queueSize = scraperService.getQueueSize();
         int activeScrapers = scraperService.getActiveScrapersCount();
         int maxScrapers = scraperService.getMaxConcurrentScrapers();
-        int position = 0;
 
         boolean queued = scraperService.startRustScraper(videoId, skipLangs);
-        if (queued) {
-            // Calculate position (only relevant if queued)
-            if (activeScrapers >= maxScrapers) {
-                // If all slots are full, position is based on queue size
-                // Add 1 because this request will be in the queue too
-                position = queueSize + 1;
-            }
-        }
 
-        String message = queued ? "Scraper queued for video " + videoId
-                : "Scraper already running/queued for video " + videoId;
+        // Determine queue position
+        int position = (queued && activeScrapers >= maxScrapers) ? queueSize + 1 : 0;
 
-        // Return JSON with queue information
-        Map<String, String> response = new HashMap<>();
-        response.put("message", message);
-        response.put("queuePosition", String.valueOf(position));
-//        response.put("activeScrapers", String.valueOf(activeScrapers));
-//        response.put("maxConcurrentScrapers", String.valueOf(maxScrapers));
-
-        return ResponseEntity.ok(response); // Return HTTP 200 with JSON message
+        return ResponseEntity.ok(Map.of(
+                "message", queued
+                        ? "Scraper queued for video " + videoId
+                        : "Scraper already running/queued for video " + videoId,
+                "queuePosition", String.valueOf(position)
+        ));
     }
 
-    @GetMapping("/keyword-ranking")
-    public java.util.Set<ZSetOperations.TypedTuple<String>> getKeywords(@RequestParam String videoId,
-                                                                        @RequestParam int k) {
-        return rankingService.getTopKeywords(videoId, k);
-    }
-
-    @GetMapping("/statistics")
-    public ResponseEntity<ScraperMetrics> getScraperStat(@RequestParam String videoId) {
-        ScraperState state = scraperService.getScraperState(videoId);
-
-        if (state == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Map<String, Double> topLanguages = rankingService.getTopLanguages(videoId, 3);
-        List<KeywordRankingPair> topKeywordsWithScores = rankingService.getTopKeywordStrings(videoId, 5);
-
-        long runningTimeMinutes = 0;
-        if (state.getStatus().name().equals("RUNNING")) {
-            Instant createdAt = state.getCreatedAt();
-            if (createdAt != null) {
-                runningTimeMinutes = Duration.between(createdAt, Instant.now()).toMinutes();
-            }
-        }
-
-        ScraperMetrics metrics = new ScraperMetrics(
-                state.getVideoTitle(),
-                state.getChannelName(),
-                state.getVideoUrl(),
-                state.getStatus(),
-                runningTimeMinutes,
-                state.getSkipLangs(),
-                state.getTopChatters(),
-                state.getRecentDonations(),
-                state.getLastThroughput(),
-                state.getMaxThroughput(),
-                state.getAverageThroughput(),
-                state.getTotalMessages().get(),
-                topKeywordsWithScores,
-                topLanguages,
-                state.getThreadName(),
-                state.getCreatedAt(),
-                state.getFinishedAt(),
-                state.getReason());
-
-        return ResponseEntity.ok(metrics);
+    @GetMapping("/stop")
+    public ResponseEntity<Map<String, String>> stopScraper(@RequestParam String videoId) {
+        String result = scraperService.stopRustScraper(videoId);
+        return ResponseEntity.ok(Collections.singletonMap("message", result));
     }
 }

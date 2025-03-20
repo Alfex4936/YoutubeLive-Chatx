@@ -52,7 +52,6 @@ public class YTRustScraperService {
     private final RBlockingQueue<ScraperTask> scraperQueue;
     private final RSemaphore scraperSemaphore;
     private final StringRedisTemplate redisTemplate;
-    private final RedissonClient redisson;
     private volatile boolean isShuttingDown = false;
     private Thread queueProcessorThread;
 
@@ -60,13 +59,12 @@ public class YTRustScraperService {
             ProfanityLogService profanityLogService,
             RankingService rankingService,
             @Qualifier("chatScraperExecutor") Executor chatScraperExecutor,
-            RedissonClient redissonClient, StringRedisTemplate redisTemplate, RedissonClient redisson) {
+            RedissonClient redissonClient, StringRedisTemplate redisTemplate) {
         this.profanityLogService = profanityLogService;
         this.rankingService = rankingService;
         this.chatScraperExecutor = chatScraperExecutor;
         this.scraperQueue = redissonClient.getBlockingQueue("scraperQueue");
         this.redisTemplate = redisTemplate;
-        this.redisson = redisson;
         this.scraperQueue.clear();
 
         this.scraperSemaphore = redissonClient.getSemaphore("scraperSemaphore");
@@ -384,6 +382,7 @@ public class YTRustScraperService {
 
     /**
      * Gets the current size of the scraper queue
+     *
      * @return The number of tasks waiting in the queue
      */
     public int getQueueSize() {
@@ -392,6 +391,7 @@ public class YTRustScraperService {
 
     /**
      * Gets the current number of active scrapers
+     *
      * @return The number of currently running scrapers
      */
     public int getActiveScrapersCount() {
@@ -400,9 +400,24 @@ public class YTRustScraperService {
 
     /**
      * Gets the maximum number of concurrent scrapers allowed
+     *
      * @return The maximum number of concurrent scrapers
      */
     public int getMaxConcurrentScrapers() {
         return MAX_CONCURRENT_SCRAPERS;
+    }
+
+    public String sanitizeVideoId(String videoId) {
+        if (videoId.startsWith("/")) {
+            return videoId.substring(1);
+        }
+        return videoId.startsWith("http")
+                ? videoId.replace(YTRustScraperService.YOUTUBE_WATCH_URL, "")
+                : videoId;
+    }
+
+    public ScraperState fetchScraperState(String videoId) {
+        ScraperState state = getScraperState(videoId);
+        return (state != null && state.isActiveOrDead()) ? state : null;
     }
 }

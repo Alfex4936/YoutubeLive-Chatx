@@ -1,7 +1,7 @@
-package csw.youtube.chat.live.controller;
+package csw.youtube.chat.live.controller.playwright;
 
 import com.github.pemistahl.lingua.api.Language;
-import csw.youtube.chat.live.service.YTPlaywrightScraperService;
+import csw.youtube.chat.live.service.playwright.YTPlaywrightScraperService;
 import csw.youtube.chat.live.service.YTRustScraperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;

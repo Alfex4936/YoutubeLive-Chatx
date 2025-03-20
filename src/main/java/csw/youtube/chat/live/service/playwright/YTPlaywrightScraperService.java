@@ -1,4 +1,4 @@
-package csw.youtube.chat.live.service;
+package csw.youtube.chat.live.service.playwright;
 
 import com.github.pemistahl.lingua.api.Language;
 import com.microsoft.playwright.Locator;
@@ -7,6 +7,7 @@ import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.options.LoadState;
 import csw.youtube.chat.live.js.YouTubeChatScriptProvider;
 import csw.youtube.chat.live.model.ScraperState;
+import csw.youtube.chat.live.service.RankingService;
 import csw.youtube.chat.playwright.PlaywrightBrowserManager;
 import csw.youtube.chat.profanity.service.ProfanityLogService;
 import lombok.Getter;

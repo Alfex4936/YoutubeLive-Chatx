@@ -367,6 +367,10 @@ public class RankingService {
                 topN - 1);
 
         // 결과 변환 (언어 -> 비율%)
+        return getLangStats(topLangs, totalMessages);
+    }
+
+    private static Map<String, Double> getLangStats(Set<ZSetOperations.TypedTuple<String>> topLangs, Double totalMessages) {
         Map<String, Double> langStats = new LinkedHashMap<>();
         if (topLangs != null) {
             for (ZSetOperations.TypedTuple<String> entry : topLangs) {

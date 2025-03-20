@@ -16,7 +16,7 @@ public class MonitorController {
 
     private final YTRustScraperService scraperService;
 
-    @GetMapping("/scraper-monitor")
+    @GetMapping("/scraperMonitor")
     public String getScraperMonitor(Model model,
                                     @RequestParam(value = "message", required = false) String msg) {
 
