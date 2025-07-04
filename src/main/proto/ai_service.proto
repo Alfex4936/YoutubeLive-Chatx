@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package csw.youtube.chat.grpc.ai;
+
+option java_package = "csw.youtube.chat.grpc.ai";
+option java_outer_classname = "AiServiceProto";
+
+// AI service for chat analysis and summarization
+service AiService {
+  // Summarize recent chat messages using AI
+  rpc SummarizeChat(SummarizeChatRequest) returns (SummarizeChatResponse);
+}
+
+// Request to summarize chat
+message SummarizeChatRequest {
+  string video_id = 1;
+  string language = 2; // Target language for summary
+}
+
+// Response with AI-generated summary
+message SummarizeChatResponse {
+  string summary = 1;
+  bool success = 2;
+  string error_message = 3;
+}

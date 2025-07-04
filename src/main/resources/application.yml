@@ -1,3 +1,11 @@
 spring:
   config:
     import: application-secret.yml
+
+# gRPC server configuration
+grpc:
+  server:
+    port: 9090
+    enable-reflection: true  # Enable gRPC reflection for testing with tools like grpcurl
+    max-inbound-message-size: 16MB
+    max-inbound-metadata-size: 8KB

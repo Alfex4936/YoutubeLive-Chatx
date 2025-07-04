@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package csw.youtube.chat.grpc.scraper;
+
+option java_package = "csw.youtube.chat.grpc.scraper";
+option java_outer_classname = "ScraperServiceProto";
+
+// Scraper management service
+service ScraperService {
+  // Start a scraper for a video
+  rpc StartScraper(StartScraperRequest) returns (StartScraperResponse);
+  
+  // Stop a scraper for a video
+  rpc StopScraper(StopScraperRequest) returns (StopScraperResponse);
+  
+  // Get scraper status
+  rpc GetScraperStatus(GetScraperStatusRequest) returns (GetScraperStatusResponse);
+}
+
+// Request to start a scraper
+message StartScraperRequest {
+  string video_id = 1;
+  repeated string skip_languages = 2; // Languages to skip (e.g., ["ENGLISH", "SPANISH"])
+}
+
+// Response from starting a scraper
+message StartScraperResponse {
+  string message = 1;
+  int32 queue_position = 2;
+  bool success = 3;
+}
+
+// Request to stop a scraper
+message StopScraperRequest {
+  string video_id = 1;
+}
+
+// Response from stopping a scraper
+message StopScraperResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+// Request to get scraper status
+message GetScraperStatusRequest {
+  string video_id = 1;
+}
+
+// Response with scraper status
+message GetScraperStatusResponse {
+  string status = 1; // RUNNING, IDLE, FAILED, etc.
+  string video_title = 2;
+  string channel_name = 3;
+  int64 total_messages = 4;
+  int32 last_throughput = 5;
+  int32 max_throughput = 6;
+  double average_throughput = 7;
+  repeated string skip_languages = 8;
+  int64 created_at = 9; // Unix timestamp
+  int64 finished_at = 10; // Unix timestamp
+  string reason = 11; // Reason for stopping if applicable
+}

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package csw.youtube.chat.grpc.user;
+
+option java_package = "csw.youtube.chat.grpc.user";
+option java_outer_classname = "UserServiceProto";
+
+// User management service
+service UserService {
+  // Get user profile
+  rpc GetUserProfile(GetUserProfileRequest) returns (GetUserProfileResponse);
+}
+
+// Request for user profile
+message GetUserProfileRequest {
+  int64 user_id = 1;
+}
+
+// Response with user profile
+message GetUserProfileResponse {
+  int64 id = 1;
+  string username = 2;
+  string email = 3;
+  string role = 4;
+  string role_description = 5;
+  repeated string permissions = 6;
+  int64 created_at = 7;
+  int64 last_login = 8;
+}

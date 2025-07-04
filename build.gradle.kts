@@ -4,6 +4,7 @@ plugins {
 	id("org.springframework.boot") version "3.4.3"
 	id("io.spring.dependency-management") version "1.1.7"
 	id("org.graalvm.buildtools.native") version "0.10.6" // GraalVM native image support
+	id("com.google.protobuf") version "0.9.4" // Protocol Buffers plugin for gRPC
 }
 
 group = "csw"
@@ -71,6 +72,14 @@ dependencies {
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
+	// gRPC dependencies
+	implementation("net.devh:grpc-spring-boot-starter:3.1.0.RELEASE")
+	implementation("io.grpc:grpc-netty-shaded:1.65.1")
+	implementation("io.grpc:grpc-protobuf:1.65.1")
+	implementation("io.grpc:grpc-stub:1.65.1")
+	implementation("com.google.protobuf:protobuf-java:3.25.3")
+	implementation("com.google.protobuf:protobuf-java-util:3.25.3")
+
 	runtimeOnly("org.postgresql:postgresql")
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
@@ -107,6 +116,25 @@ graalvmNative {
 	binaries {
 		named("main") {
 			buildArgs.add("--no-fallback") // Disable Java fallback image
+		}
+	}
+}
+
+// Protocol Buffers configuration
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:3.25.3"
+	}
+	plugins {
+		create("grpc") {
+			artifact = "io.grpc:protoc-gen-grpc-java:1.65.1"
+		}
+	}
+	generateProtoTasks {
+		all().forEach { task ->
+			task.plugins {
+				create("grpc")
+			}
 		}
 	}
 }

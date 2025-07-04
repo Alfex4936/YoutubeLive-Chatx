@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package csw.youtube.chat.grpc.statistics;
+
+option java_package = "csw.youtube.chat.grpc.statistics";
+option java_outer_classname = "StatisticsServiceProto";
+
+// Statistics service for retrieving metrics and data
+service StatisticsService {
+  // Get statistics for a specific video
+  rpc GetStatistics(GetStatisticsRequest) returns (GetStatisticsResponse);
+  
+  // Update metrics for a scraper
+  rpc UpdateMetrics(UpdateMetricsRequest) returns (UpdateMetricsResponse);
+  
+  // Process chat messages
+  rpc ProcessMessages(ProcessMessagesRequest) returns (ProcessMessagesResponse);
+  
+  // Get message graph data
+  rpc GetMessageGraph(GetMessageGraphRequest) returns (GetMessageGraphResponse);
+}
+
+// Request for statistics
+message GetStatisticsRequest {
+  string video_id = 1;
+}
+
+// Response with comprehensive statistics
+message GetStatisticsResponse {
+  string video_title = 1;
+  string channel_name = 2;
+  string video_url = 3;
+  string status = 4;
+  int64 running_time_minutes = 5;
+  repeated string skip_languages = 6;
+  repeated TopChatter top_chatters = 7;
+  repeated RecentDonation recent_donations = 8;
+  int32 last_throughput = 9;
+  int32 max_throughput = 10;
+  double average_throughput = 11;
+  int64 total_messages = 12;
+  repeated KeywordRanking top_keywords = 13;
+  repeated LanguageStats language_stats = 14;
+  string thread_name = 15;
+  int64 created_at = 16;
+  int64 finished_at = 17;
+  string reason = 18;
+}
+
+// Top chatter information
+message TopChatter {
+  string username = 1;
+  int32 message_count = 2;
+}
+
+// Recent donation information
+message RecentDonation {
+  string username = 1;
+  string amount = 2;
+  string currency = 3;
+  int64 timestamp = 4;
+}
+
+// Keyword ranking information
+message KeywordRanking {
+  string keyword = 1;
+  int32 count = 2;
+}
+
+// Language statistics
+message LanguageStats {
+  string language = 1;
+  double percentage = 2;
+}
+
+// Request to update metrics
+message UpdateMetricsRequest {
+  string video_id = 1;
+  string status = 2;
+  int32 throughput = 3;
+  int64 total_messages = 4;
+  string video_title = 5;
+  string channel_name = 6;
+  string video_url = 7;
+  string reason = 8;
+}
+
+// Response from updating metrics
+message UpdateMetricsResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Request to process messages
+message ProcessMessagesRequest {
+  string video_id = 1;
+  repeated ChatMessage messages = 2;
+}
+
+// Chat message structure
+message ChatMessage {
+  string author = 1;
+  string text = 2;
+  int64 timestamp = 3;
+  string language = 4;
+  bool is_donation = 5;
+  string donation_amount = 6;
+}
+
+// Response from processing messages
+message ProcessMessagesResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Request for message graph
+message GetMessageGraphRequest {
+  string video_id = 1;
+  string language = 2;
+}
+
+// Response with graph data
+message GetMessageGraphResponse {
+  bytes graph_data = 1; // PNG image data
+  string content_type = 2;
+}
